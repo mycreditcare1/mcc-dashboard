@@ -1,93 +1,131 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MCC Dashboard</title>
+  <title>My Credit Care Dashboard</title>
+
   <style>
     body {
-      font-family: Arial;
+      font-family: Arial, sans-serif;
       background: #0f172a;
       color: white;
+      margin: 0;
+    }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 20px;
+      background: #020617;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .header img {
+      width: 180px;
+    }
+
+    /* CONTAINER */
+    .container {
+      padding: 25px;
     }
 
     h1 {
-      margin-bottom: 10px;
+      margin-bottom: 20px;
+      font-weight: 600;
     }
 
+    /* CARDS */
     .card {
       background: #1e293b;
-      padding: 15px;
-      border-radius: 10px;
-      margin-bottom: 15px;
+      padding: 18px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
 
+    /* TABLE */
     table {
       width: 100%;
       border-collapse: collapse;
     }
 
     th, td {
-      padding: 10px;
+      padding: 12px;
       border-bottom: 1px solid #334155;
       text-align: left;
     }
 
     th {
       color: #94a3b8;
+      font-weight: 500;
     }
   </style>
 </head>
+
 <body>
 
-<h1>MCC Live Dashboard</h1>
+  <!-- HEADER -->
+  <div class="header">
+    <img src="My Credit Care_Fin-01.png" />
+  </div>
 
-<div class="card">
-  <h3>Total Events: <span id="totalEvents">0</span></h3>
-</div>
+  <!-- MAIN -->
+  <div class="container">
 
-<div class="card">
-  <h3>Recent Activity</h3>
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Phone</th>
-        <th>Email</th>
-        <th>Sub Account</th>
-        <th>Debt</th>
-      </tr>
-    </thead>
-    <tbody id="tableBody"></tbody>
-  </table>
-</div>
+    <h1>My Credit Care Dashboard</h1>
 
-<script>
-async function loadData() {
-  const res = await fetch('/api/ghl');
-  const data = await res.json();
+    <div class="card">
+      <h3>Total Events: <span id="totalEvents">0</span></h3>
+    </div>
 
-  document.getElementById('totalEvents').innerText = data.totalEvents;
+    <div class="card">
+      <h3>Recent Activity</h3>
 
-  const table = document.getElementById('tableBody');
-  table.innerHTML = '';
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Sub Account</th>
+            <th>Debt</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
 
-  data.recentContacts.forEach(c => {
-    const row = `
-      <tr>
-        <td>${c.name}</td>
-        <td>${c.phone}</td>
-        <td>${c.email}</td>
-        <td>${c.subAccount}</td>
-        <td>${c.debtAmount}</td>
-      </tr>
-    `;
-    table.innerHTML += row;
-  });
-}
+  </div>
 
-setInterval(loadData, 2000);
-loadData();
-</script>
+  <!-- SCRIPT -->
+  <script>
+    async function loadData() {
+      const res = await fetch('/api/ghl');
+      const data = await res.json();
+
+      document.getElementById('totalEvents').innerText = data.totalEvents;
+
+      const table = document.getElementById('tableBody');
+      table.innerHTML = '';
+
+      data.recentContacts.forEach(c => {
+        const row = `
+          <tr>
+            <td>${c.name}</td>
+            <td>${c.phone}</td>
+            <td>${c.email}</td>
+            <td>${c.subAccount}</td>
+            <td>${c.debtAmount}</td>
+          </tr>
+        `;
+        table.innerHTML += row;
+      });
+    }
+
+    setInterval(loadData, 2000);
+    loadData();
+  </script>
 
 </body>
 </html>
