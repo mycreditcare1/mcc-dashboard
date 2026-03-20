@@ -1,50 +1,35 @@
 let stats = {
-  agents: 0,
-  calls: 0,
-  leads: 0,
+  totalEvents: 0,
   lastEvent: null,
-  lastPayload: null
+  lastPayload: null,
+  recentContacts: []
 };
 
 export default function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
 
-    const eventType =
-      body.type ||
-      body.event ||
-      body.trigger ||
-      body.webhookType ||
-      "unknown";
+    stats.totalEvents += 1;
 
-    stats.lastEvent = eventType;
-    stats.lastPayload = body;
+    const contact = {
+      name:
+        body.full_name ||
+        [body.first_name, body.last_name].filter(Boolean).join(" ") ||
+        "Unknown",
+      phone: body.phone || "",
+      email: body.email || "",
+      subAccount: body.location?.name || "",
+      debtAmount: body["Debt Amount"] || ""
+    };
 
-    // Temporary broad matching until we confirm your exact GHL payload
-    if (
-      String(eventType).toLowerCase().includes("inboundmessage") ||
-      String(eventType).toLowerCase().includes("conversation")
-    ) {
-      stats.calls += 1;
-    }
+    stats.lastEvent = "contact_event";
+    stats.lastPayload = contact;
 
-    if (
-      String(eventType).toLowerCase().includes("contact") ||
-      String(eventType).toLowerCase().includes("lead")
-    ) {
-      stats.leads += 1;
-    }
+    // add to recent list
+    stats.recentContacts.unshift(contact);
+    stats.recentContacts = stats.recentContacts.slice(0, 10);
 
-    if (
-      String(eventType).toLowerCase().includes("appointment")
-    ) {
-      stats.agents += 1;
-    }
-
-    return res.status(200).json({
-      success: true,
-      received: eventType
-    });
+    return res.status(200).json({ success: true });
   }
 
   return res.status(200).json(stats);
