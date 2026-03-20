@@ -19,13 +19,17 @@ export default function handler(req, res) {
       phone: body.phone || "",
       email: body.email || "",
       subAccount: body.location?.name || "",
-      debtAmount: body["Debt Amount"] || ""
+      debtAmount: body["Debt Amount"] || "",
+      agent:
+        body.assigned_to ||
+        body.assignedTo ||
+        body.userName ||
+        "Unassigned"
     };
 
     stats.lastEvent = "contact_event";
     stats.lastPayload = contact;
 
-    // add to recent list
     stats.recentContacts.unshift(contact);
     stats.recentContacts = stats.recentContacts.slice(0, 10);
 
