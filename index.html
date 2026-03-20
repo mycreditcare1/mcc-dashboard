@@ -15,6 +15,7 @@
       --blue: #3b82f6;
       --green: #22c55e;
       --gold: #f59e0b;
+      --red: #ef4444;
       --shadow: 0 10px 30px rgba(0,0,0,.35);
     }
 
@@ -95,7 +96,7 @@
 
     .container {
       padding: 28px;
-      max-width: 1500px;
+      max-width: 1600px;
       margin: 0 auto;
     }
 
@@ -153,7 +154,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(6, 1fr);
       gap: 18px;
       margin-bottom: 22px;
     }
@@ -164,16 +165,16 @@
 
     .stat-label {
       color: var(--muted);
-      font-size: 13px;
+      font-size: 12px;
       text-transform: uppercase;
       letter-spacing: .08em;
       margin-bottom: 10px;
     }
 
     .stat-value {
-      font-size: 36px;
+      font-size: 30px;
       font-weight: 800;
-      line-height: 1;
+      line-height: 1.05;
     }
 
     .stat-sub {
@@ -225,6 +226,7 @@
       text-align: left;
       border-bottom: 1px solid var(--line);
       font-size: 14px;
+      vertical-align: middle;
     }
 
     th {
@@ -244,37 +246,60 @@
       font-weight: 700;
     }
 
-    .sub-pill {
+    .sub-pill,
+    .debt-pill,
+    .agent-pill,
+    .dir-pill,
+    .status-pill {
       display: inline-block;
       padding: 6px 10px;
       border-radius: 999px;
-      background: rgba(59,130,246,0.12);
-      border: 1px solid rgba(59,130,246,0.25);
-      color: #bfdbfe;
       font-size: 12px;
       font-weight: 700;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .sub-pill {
+      background: rgba(59,130,246,0.12);
+      border-color: rgba(59,130,246,0.25);
+      color: #bfdbfe;
     }
 
     .debt-pill {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
       background: rgba(245,158,11,0.12);
-      border: 1px solid rgba(245,158,11,0.25);
+      border-color: rgba(245,158,11,0.25);
       color: #fde68a;
-      font-size: 12px;
-      font-weight: 700;
     }
 
     .agent-pill {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
       background: rgba(34,197,94,0.12);
-      border: 1px solid rgba(34,197,94,0.25);
+      border-color: rgba(34,197,94,0.25);
       color: #86efac;
-      font-size: 12px;
-      font-weight: 700;
+    }
+
+    .dir-pill {
+      background: rgba(59,130,246,0.12);
+      border-color: rgba(59,130,246,0.25);
+      color: #bfdbfe;
+    }
+
+    .status-pill.good {
+      background: rgba(34,197,94,0.12);
+      border-color: rgba(34,197,94,0.25);
+      color: #86efac;
+    }
+
+    .status-pill.warn {
+      background: rgba(245,158,11,0.12);
+      border-color: rgba(245,158,11,0.25);
+      color: #fde68a;
+    }
+
+    .status-pill.bad {
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.25);
+      color: #fca5a5;
     }
 
     .side-stack {
@@ -314,18 +339,49 @@
       word-break: break-word;
     }
 
+    .leaderboard-row {
+      display: grid;
+      grid-template-columns: 1.1fr .55fr .55fr .55fr .7fr .7fr .7fr;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
+    .leaderboard-head {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 8px;
+    }
+
+    .leaderboard-name {
+      font-weight: 700;
+      color: var(--text);
+    }
+
     .empty {
       color: var(--muted);
       padding: 20px;
       text-align: center;
     }
 
-    @media (max-width: 1100px) {
+    @media (max-width: 1350px) {
+      .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
       .hero,
       .layout {
         grid-template-columns: 1fr;
       }
+    }
 
+    @media (max-width: 900px) {
       .stats-grid {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -353,6 +409,15 @@
       .brand-copy h1 {
         font-size: 22px;
       }
+
+      .leaderboard-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+
+      .leaderboard-head {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -365,7 +430,7 @@
       </div>
       <div class="brand-copy">
         <h1>My Credit Care Dashboard</h1>
-        <p>Live lead and activity visibility across your GHL sub accounts</p>
+        <p>Level 3 leaderboard dashboard for calls, talk time, debt, and agent performance</p>
       </div>
     </div>
 
@@ -378,10 +443,10 @@
   <div class="container">
     <div class="hero">
       <div class="hero-card">
-        <h2>Executive Overview</h2>
+        <h2>Team Performance Overview</h2>
         <p>
-          Monitor live inbound activity, recent contacts, debt opportunity, agent assignment,
-          and sub account traffic in one clean internal dashboard.
+          Track call volume, inbound vs outbound mix, answered calls, team talk time,
+          debt volume, and agent leaderboard performance in one place.
         </p>
       </div>
 
@@ -393,27 +458,39 @@
 
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Total Events</div>
+        <div class="stat-label">Total Calls</div>
         <div class="stat-value" id="totalEvents">0</div>
-        <div class="stat-sub">Webhook events received</div>
+        <div class="stat-sub">All visible call events</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Recent Contacts</div>
-        <div class="stat-value" id="recentCount">0</div>
-        <div class="stat-sub">Last 10 entries</div>
+        <div class="stat-label">Inbound Calls</div>
+        <div class="stat-value" id="inboundCount">0</div>
+        <div class="stat-sub">Visible inbound count</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Latest Contact</div>
-        <div class="stat-value" id="latestName" style="font-size: 24px;">None</div>
-        <div class="stat-sub" id="latestPhone">No phone yet</div>
+        <div class="stat-label">Outbound Calls</div>
+        <div class="stat-value" id="outboundCount">0</div>
+        <div class="stat-sub">Visible outbound count</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Latest Debt</div>
-        <div class="stat-value" id="latestDebt" style="font-size: 28px;">$0</div>
-        <div class="stat-sub">Newest visible debt amount</div>
+        <div class="stat-label">Answered / Completed</div>
+        <div class="stat-value" id="answeredCount">0</div>
+        <div class="stat-sub">Based on call status</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Team Talk Time</div>
+        <div class="stat-value" id="teamTalkTime">0m</div>
+        <div class="stat-sub">Total visible talk time</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Visible Debt Total</div>
+        <div class="stat-value" id="visibleDebtTotal">$0</div>
+        <div class="stat-sub">Sum of visible debt</div>
       </div>
     </div>
 
@@ -434,11 +511,14 @@
                 <th>Sub Account</th>
                 <th>Debt</th>
                 <th>Agent</th>
+                <th>Direction</th>
+                <th>Status</th>
+                <th>Duration</th>
               </tr>
             </thead>
             <tbody id="tableBody">
               <tr>
-                <td colspan="6" class="empty">Waiting for live activity...</td>
+                <td colspan="9" class="empty">Waiting for live activity...</td>
               </tr>
             </tbody>
           </table>
@@ -446,6 +526,25 @@
       </div>
 
       <div class="side-stack">
+        <div class="side-card">
+          <h3>Agent Leaderboard</h3>
+          <div class="leaderboard-head leaderboard-row">
+            <div>Agent</div>
+            <div>Calls</div>
+            <div>In</div>
+            <div>Out</div>
+            <div>Talk</div>
+            <div>Avg</div>
+            <div>Last</div>
+          </div>
+          <div class="mini-list" id="leaderboard">
+            <div class="mini-item">
+              <strong>No agent data yet</strong>
+              <span>Waiting for call activity.</span>
+            </div>
+          </div>
+        </div>
+
         <div class="side-card">
           <h3>Latest Contact Snapshot</h3>
           <div class="mini-list" id="latestCard">
@@ -474,6 +573,61 @@
       return value && String(value).trim() ? value : fallback;
     }
 
+    function parseDebt(value) {
+      const num = Number(String(value || '').replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(num) ? num : 0;
+    }
+
+    function parseDuration(value) {
+      if (value === null || value === undefined || value === '') return 0;
+
+      if (typeof value === 'number') return value;
+
+      const str = String(value).trim();
+
+      if (/^\\d+$/.test(str)) return Number(str);
+
+      if (str.includes(':')) {
+        const parts = str.split(':').map(Number);
+        if (parts.some(Number.isNaN)) return 0;
+
+        if (parts.length === 3) {
+          return parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+
+        if (parts.length === 2) {
+          return parts[0] * 60 + parts[1];
+        }
+      }
+
+      return 0;
+    }
+
+    function formatMoney(value) {
+      return '$' + Number(value || 0).toLocaleString(undefined, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    }
+
+    function formatDuration(seconds) {
+      const total = Number(seconds || 0);
+      const hrs = Math.floor(total / 3600);
+      const mins = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+
+      if (hrs > 0) return `${hrs}h ${mins}m`;
+      if (mins > 0) return `${mins}m ${secs}s`;
+      return `${secs}s`;
+    }
+
+    function statusClass(status) {
+      const s = String(status || '').toLowerCase();
+      if (s.includes('answer') || s.includes('complete')) return 'good';
+      if (s.includes('miss') || s.includes('no answer') || s.includes('busy') || s.includes('failed')) return 'bad';
+      return 'warn';
+    }
+
     async function loadData() {
       const res = await fetch('/api/ghl');
       const data = await res.json();
@@ -481,11 +635,28 @@
       const recentContacts = Array.isArray(data.recentContacts) ? data.recentContacts : [];
       const latest = recentContacts.length ? recentContacts[0] : null;
 
+      const inboundCount = recentContacts.filter(c =>
+        String(c.callDirection || '').toLowerCase().includes('inbound')
+      ).length;
+
+      const outboundCount = recentContacts.filter(c =>
+        String(c.callDirection || '').toLowerCase().includes('outbound')
+      ).length;
+
+      const answeredCount = recentContacts.filter(c => {
+        const s = String(c.callStatus || '').toLowerCase();
+        return s.includes('answer') || s.includes('complete');
+      }).length;
+
+      const visibleDebtTotal = recentContacts.reduce((sum, c) => sum + parseDebt(c.debtAmount), 0);
+      const teamTalkSeconds = recentContacts.reduce((sum, c) => sum + parseDuration(c.callDurationRaw || c.callDurationSeconds || c.callDuration), 0);
+
       document.getElementById('totalEvents').innerText = data.totalEvents || 0;
-      document.getElementById('recentCount').innerText = recentContacts.length;
-      document.getElementById('latestName').innerText = latest ? latest.name : 'None';
-      document.getElementById('latestPhone').innerText = latest ? latest.phone : 'No phone yet';
-      document.getElementById('latestDebt').innerText = latest ? latest.debtAmount : '$0';
+      document.getElementById('inboundCount').innerText = inboundCount;
+      document.getElementById('outboundCount').innerText = outboundCount;
+      document.getElementById('answeredCount').innerText = answeredCount;
+      document.getElementById('teamTalkTime').innerText = formatDuration(teamTalkSeconds);
+      document.getElementById('visibleDebtTotal').innerText = formatMoney(visibleDebtTotal);
       document.getElementById('lastSubAccount').innerText = latest ? latest.subAccount : 'Waiting...';
 
       const table = document.getElementById('tableBody');
@@ -494,7 +665,7 @@
       if (!recentContacts.length) {
         table.innerHTML = `
           <tr>
-            <td colspan="6" class="empty">Waiting for live activity...</td>
+            <td colspan="9" class="empty">Waiting for live activity...</td>
           </tr>
         `;
       } else {
@@ -507,6 +678,9 @@
               <td><span class="sub-pill">${formatSafe(c.subAccount, 'Unknown')}</span></td>
               <td><span class="debt-pill">${formatSafe(c.debtAmount, '$0')}</span></td>
               <td><span class="agent-pill">${formatSafe(c.agent, 'Unassigned')}</span></td>
+              <td><span class="dir-pill">${formatSafe(c.callDirection, 'N/A')}</span></td>
+              <td><span class="status-pill ${statusClass(c.callStatus)}">${formatSafe(c.callStatus, 'N/A')}</span></td>
+              <td>${formatDuration(parseDuration(c.callDurationRaw || c.callDurationSeconds || c.callDuration))}</td>
             </tr>
           `;
           table.innerHTML += row;
@@ -525,13 +699,67 @@
         latestCard.innerHTML = `
           <div class="mini-item">
             <strong>${formatSafe(latest.name, 'Unknown')}</strong>
-            <span>${formatSafe(latest.phone, 'No phone')}</span>
+            <span>${formatSafe(latest.phone, 'No phone')} • ${formatSafe(latest.email, 'No email')}</span>
           </div>
           <div class="mini-item">
-            <strong>${formatSafe(latest.email, 'No email')}</strong>
-            <span>${formatSafe(latest.subAccount, 'Unknown sub account')} • ${formatSafe(latest.debtAmount, '$0')} • ${formatSafe(latest.agent, 'Unassigned')}</span>
+            <strong>${formatSafe(latest.agent, 'Unassigned')}</strong>
+            <span>${formatSafe(latest.subAccount, 'Unknown')} • ${formatSafe(latest.debtAmount, '$0')} • ${formatSafe(latest.callStatus, 'No call status')}</span>
           </div>
         `;
+      }
+
+      const agentMap = {};
+      recentContacts.forEach(c => {
+        const agent = formatSafe(c.agent, 'Unassigned');
+        const duration = parseDuration(c.callDurationRaw || c.callDurationSeconds || c.callDuration);
+        const debt = parseDebt(c.debtAmount);
+        const direction = String(c.callDirection || '').toLowerCase();
+
+        if (!agentMap[agent]) {
+          agentMap[agent] = {
+            calls: 0,
+            inbound: 0,
+            outbound: 0,
+            totalTalk: 0,
+            lastCall: 0,
+            debt: 0
+          };
+        }
+
+        agentMap[agent].calls += 1;
+        if (direction.includes('inbound')) agentMap[agent].inbound += 1;
+        if (direction.includes('outbound')) agentMap[agent].outbound += 1;
+        agentMap[agent].totalTalk += duration;
+        agentMap[agent].lastCall = duration;
+        agentMap[agent].debt += debt;
+      });
+
+      const leaderboardData = Object.entries(agentMap)
+        .sort((a, b) => b[1].totalTalk - a[1].totalTalk);
+
+      const leaderboard = document.getElementById('leaderboard');
+      if (!leaderboardData.length) {
+        leaderboard.innerHTML = `
+          <div class="mini-item">
+            <strong>No agent data yet</strong>
+            <span>Waiting for call activity.</span>
+          </div>
+        `;
+      } else {
+        leaderboard.innerHTML = leaderboardData.map(([agent, info]) => {
+          const avg = info.calls ? Math.round(info.totalTalk / info.calls) : 0;
+          return `
+            <div class="leaderboard-row">
+              <div class="leaderboard-name">${agent}</div>
+              <div>${info.calls}</div>
+              <div>${info.inbound}</div>
+              <div>${info.outbound}</div>
+              <div>${formatDuration(info.totalTalk)}</div>
+              <div>${formatDuration(avg)}</div>
+              <div>${formatDuration(info.lastCall)}</div>
+            </div>
+          `;
+        }).join('');
       }
 
       const subFeed = document.getElementById('subFeed');
