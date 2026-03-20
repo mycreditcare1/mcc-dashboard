@@ -10,36 +10,50 @@
       text-align: center;
       padding: 50px;
     }
-    h1 {
-      color: #4da3ff;
-    }
+    h1 { color: #4da3ff; }
     .card {
       background: #111827;
       padding: 20px;
       margin: 20px auto;
       width: 300px;
       border-radius: 10px;
+      font-size: 20px;
     }
   </style>
 </head>
 <body>
 
-<h1>MCC Dashboard</h1>
+<h1>MCC Live Dashboard</h1>
 
 <div class="card">
-  <h2>Agents Online</h2>
-  <p>0</p>
+  Agents Online: <span id="agents">Loading...</span>
 </div>
 
 <div class="card">
-  <h2>Calls Active</h2>
-  <p>0</p>
+  Calls Active: <span id="calls">Loading...</span>
 </div>
 
 <div class="card">
-  <h2>Leads in Queue</h2>
-  <p>0</p>
+  Leads in Queue: <span id="leads">Loading...</span>
 </div>
+
+<script>
+async function loadData() {
+  try {
+    const res = await fetch('/api/data');
+    const data = await res.json();
+
+    document.getElementById('agents').innerText = data.agents;
+    document.getElementById('calls').innerText = data.calls;
+    document.getElementById('leads').innerText = data.leads;
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+setInterval(loadData, 5000);
+loadData();
+</script>
 
 </body>
 </html>
