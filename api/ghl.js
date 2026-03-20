@@ -48,6 +48,7 @@ function getValue(body, keys = []) {
       const parts = key.split(".");
       let current = body;
       let found = true;
+
       for (const part of parts) {
         if (current && Object.prototype.hasOwnProperty.call(current, part)) {
           current = current[part];
@@ -56,6 +57,7 @@ function getValue(body, keys = []) {
           break;
         }
       }
+
       if (found && current !== undefined && current !== null && current !== "") {
         return current;
       }
@@ -63,18 +65,31 @@ function getValue(body, keys = []) {
       return body[key];
     }
   }
+
   return "";
 }
 
 function normalizeDirection(value) {
   const str = String(value || "").toLowerCase();
-  if (str.includes("inbound") || str === "in") return "Inbound";
-  if (str.includes("outbound") || str === "out") return "Outbound";
+
+  if (
+    str.includes("inbound") ||
+    str === "in" ||
+    str === "inbound_call"
+  ) return "Inbound";
+
+  if (
+    str.includes("outbound") ||
+    str === "out" ||
+    str === "outbound_call"
+  ) return "Outbound";
+
   return "";
 }
 
 function normalizeStatus(value) {
   const str = String(value || "").toLowerCase();
+
   if (!str) return "";
   if (str.includes("answered")) return "Answered";
   if (str.includes("complete")) return "Completed";
@@ -82,12 +97,15 @@ function normalizeStatus(value) {
   if (str.includes("no answer")) return "No Answer";
   if (str.includes("busy")) return "Busy";
   if (str.includes("fail")) return "Failed";
+
   return titleCase(value);
 }
 
 export default function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
+
+    console.log("FULL WEBHOOK:", JSON.stringify(body, null, 2));
 
     stats.totalEvents += 1;
 
@@ -102,6 +120,7 @@ export default function handler(req, res) {
       "Call Direction",
       "callDirection",
       "direction",
+      "type",
       "phoneCall.direction"
     ]);
 
@@ -121,6 +140,7 @@ export default function handler(req, res) {
 
     const startTimeValue = getValue(body, [
       "Call Start Time",
+      "Start Time",
       "callStartTime",
       "startTime",
       "phoneCall.startTime"
@@ -128,6 +148,7 @@ export default function handler(req, res) {
 
     const endTimeValue = getValue(body, [
       "Call End Time",
+      "End Time",
       "callEndTime",
       "endTime",
       "phoneCall.endTime"
@@ -165,9 +186,10 @@ export default function handler(req, res) {
         "contact.email"
       ]),
 
-      subAccount: locationValue && typeof locationValue === "object"
-        ? locationValue.name || ""
-        : locationValue || "",
+      subAccount:
+        locationValue && typeof locationValue === "object"
+          ? locationValue.name || ""
+          : locationValue || "",
 
       debtAmount: getValue(body, [
         "Debt Amount",
@@ -192,6 +214,8 @@ export default function handler(req, res) {
       timeOfCall: timeOfCallValue,
       createdAt: new Date().toISOString()
     };
+
+    console.log("PARSED CONTACT:", JSON.stringify(contact, null, 2));
 
     stats.lastEvent = "call_event";
     stats.lastPayload = contact;
