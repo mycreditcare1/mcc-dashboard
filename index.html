@@ -5,19 +5,35 @@
   <style>
     body {
       font-family: Arial;
-      background: #0b0f1a;
+      background: #0f172a;
       color: white;
-      text-align: center;
-      padding: 50px;
-    }
-    h1 { color: #4da3ff; }
-    .card {
-      background: #111827;
       padding: 20px;
-      margin: 20px auto;
-      width: 300px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 15px;
       border-radius: 10px;
-      font-size: 20px;
+      margin-bottom: 15px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #334155;
+      text-align: left;
+    }
+
+    th {
+      color: #94a3b8;
     }
   </style>
 </head>
@@ -26,32 +42,50 @@
 <h1>MCC Live Dashboard</h1>
 
 <div class="card">
-  Agents Online: <span id="agents">Loading...</span>
+  <h3>Total Events: <span id="totalEvents">0</span></h3>
 </div>
 
 <div class="card">
-  Calls Active: <span id="calls">Loading...</span>
-</div>
-
-<div class="card">
-  Leads in Queue: <span id="leads">Loading...</span>
+  <h3>Recent Activity</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Phone</th>
+        <th>Email</th>
+        <th>Sub Account</th>
+        <th>Debt</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
 </div>
 
 <script>
 async function loadData() {
-  try {
-    const res = await fetch('/api/data');
-    const data = await res.json();
+  const res = await fetch('/api/ghl');
+  const data = await res.json();
 
-    document.getElementById('agents').innerText = data.agents;
-    document.getElementById('calls').innerText = data.calls;
-    document.getElementById('leads').innerText = data.leads;
-  } catch (e) {
-    console.log(e);
-  }
+  document.getElementById('totalEvents').innerText = data.totalEvents;
+
+  const table = document.getElementById('tableBody');
+  table.innerHTML = '';
+
+  data.recentContacts.forEach(c => {
+    const row = `
+      <tr>
+        <td>${c.name}</td>
+        <td>${c.phone}</td>
+        <td>${c.email}</td>
+        <td>${c.subAccount}</td>
+        <td>${c.debtAmount}</td>
+      </tr>
+    `;
+    table.innerHTML += row;
+  });
 }
 
-setInterval(loadData, 5000);
+setInterval(loadData, 2000);
 loadData();
 </script>
 
