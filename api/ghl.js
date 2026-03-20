@@ -72,17 +72,13 @@ function getValue(body, keys = []) {
 function normalizeDirection(value) {
   const str = String(value || "").toLowerCase();
 
-  if (
-    str.includes("inbound") ||
-    str === "in" ||
-    str === "inbound_call"
-  ) return "Inbound";
+  if (str.includes("inbound") || str === "in" || str === "inbound_call") {
+    return "Inbound";
+  }
 
-  if (
-    str.includes("outbound") ||
-    str === "out" ||
-    str === "outbound_call"
-  ) return "Outbound";
+  if (str.includes("outbound") || str === "out" || str === "outbound_call") {
+    return "Outbound";
+  }
 
   return "";
 }
@@ -104,8 +100,7 @@ function normalizeStatus(value) {
 export default function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
-
-    console.log("FULL WEBHOOK:", JSON.stringify(body, null, 2));
+    const customData = body.customData || {};
 
     stats.totalEvents += 1;
 
@@ -117,6 +112,7 @@ export default function handler(req, res) {
     ]);
 
     const directionValue = getValue(body, [
+      "customData.Call Direction",
       "Call Direction",
       "callDirection",
       "direction",
@@ -125,6 +121,7 @@ export default function handler(req, res) {
     ]);
 
     const statusValue = getValue(body, [
+      "customData.Call Status",
       "Call Status",
       "callStatus",
       "status",
@@ -132,6 +129,7 @@ export default function handler(req, res) {
     ]);
 
     const durationValue = getValue(body, [
+      "customData.Call Duration",
       "Call Duration",
       "callDuration",
       "duration",
@@ -139,27 +137,33 @@ export default function handler(req, res) {
     ]);
 
     const startTimeValue = getValue(body, [
-      "Call Start Time",
+      "customData.Start Time",
+      "customData.Call Start Time",
       "Start Time",
+      "Call Start Time",
       "callStartTime",
       "startTime",
       "phoneCall.startTime"
     ]);
 
     const endTimeValue = getValue(body, [
-      "Call End Time",
+      "customData.End Time",
+      "customData.Call End Time",
       "End Time",
+      "Call End Time",
       "callEndTime",
       "endTime",
       "phoneCall.endTime"
     ]);
 
     const timeOfCallValue = getValue(body, [
+      "customData.Time of Call",
       "Time of Call",
       "timeOfCall"
     ]);
 
     const agentValue = getValue(body, [
+      "customData.Agent",
       "Agent",
       "agent",
       "phoneCall.answeredBy.user.name",
@@ -214,8 +218,6 @@ export default function handler(req, res) {
       timeOfCall: timeOfCallValue,
       createdAt: new Date().toISOString()
     };
-
-    console.log("PARSED CONTACT:", JSON.stringify(contact, null, 2));
 
     stats.lastEvent = "call_event";
     stats.lastPayload = contact;
