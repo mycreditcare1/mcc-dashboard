@@ -42,25 +42,154 @@ function titleCase(value) {
     .replace(/\b\w/g, s => s.toUpperCase());
 }
 
+function getValue(body, keys = []) {
+  for (const key of keys) {
+    if (key.includes(".")) {
+      const parts = key.split(".");
+      let current = body;
+      let found = true;
+      for (const part of parts) {
+        if (current && Object.prototype.hasOwnProperty.call(current, part)) {
+          current = current[part];
+        } else {
+          found = false;
+          break;
+        }
+      }
+      if (found && current !== undefined && current !== null && current !== "") {
+        return current;
+      }
+    } else if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+      return body[key];
+    }
+  }
+  return "";
+}
+
+function normalizeDirection(value) {
+  const str = String(value || "").toLowerCase();
+  if (str.includes("inbound") || str === "in") return "Inbound";
+  if (str.includes("outbound") || str === "out") return "Outbound";
+  return "";
+}
+
+function normalizeStatus(value) {
+  const str = String(value || "").toLowerCase();
+  if (!str) return "";
+  if (str.includes("answered")) return "Answered";
+  if (str.includes("complete")) return "Completed";
+  if (str.includes("miss")) return "Missed";
+  if (str.includes("no answer")) return "No Answer";
+  if (str.includes("busy")) return "Busy";
+  if (str.includes("fail")) return "Failed";
+  return titleCase(value);
+}
+
 export default function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
 
     stats.totalEvents += 1;
 
+    const locationValue = getValue(body, [
+      "location.name",
+      "location",
+      "Sub Account",
+      "subAccount"
+    ]);
+
+    const directionValue = getValue(body, [
+      "Call Direction",
+      "callDirection",
+      "direction",
+      "phoneCall.direction"
+    ]);
+
+    const statusValue = getValue(body, [
+      "Call Status",
+      "callStatus",
+      "status",
+      "phoneCall.callStatus"
+    ]);
+
+    const durationValue = getValue(body, [
+      "Call Duration",
+      "callDuration",
+      "duration",
+      "phoneCall.duration"
+    ]);
+
+    const startTimeValue = getValue(body, [
+      "Call Start Time",
+      "callStartTime",
+      "startTime",
+      "phoneCall.startTime"
+    ]);
+
+    const endTimeValue = getValue(body, [
+      "Call End Time",
+      "callEndTime",
+      "endTime",
+      "phoneCall.endTime"
+    ]);
+
+    const timeOfCallValue = getValue(body, [
+      "Time of Call",
+      "timeOfCall"
+    ]);
+
+    const agentValue = getValue(body, [
+      "Agent",
+      "agent",
+      "phoneCall.answeredBy.user.name",
+      "phoneCall.user.name",
+      "assigned_to",
+      "assignedTo",
+      "userName"
+    ]);
+
     const contact = {
-      name: body.full_name || "Unknown",
-      phone: body.phone || "",
-      email: body.email || "",
-      subAccount: body.location || "",
-      debtAmount: body["Debt Amount"] || "",
-      debtValue: normalizeDebt(body["Debt Amount"] || ""),
-      agent: body.Agent || "Unassigned",
-      callDirection: titleCase(body["Call Direction"] || ""),
-      callStatus: titleCase(body["Call Status"] || ""),
-      callDurationRaw: body["Call Duration"] || "",
-      callDurationSeconds: normalizeDuration(body["Call Duration"] || ""),
-      callStartTime: body["Call Start Time"] || "",
+      name: getValue(body, [
+        "full_name",
+        "fullName",
+        "contact.full_name"
+      ]) || "Unknown",
+
+      phone: getValue(body, [
+        "phone",
+        "contact.phone"
+      ]),
+
+      email: getValue(body, [
+        "email",
+        "contact.email"
+      ]),
+
+      subAccount: locationValue && typeof locationValue === "object"
+        ? locationValue.name || ""
+        : locationValue || "",
+
+      debtAmount: getValue(body, [
+        "Debt Amount",
+        "debtAmount",
+        "contact.debt_amount"
+      ]),
+
+      debtValue: normalizeDebt(getValue(body, [
+        "Debt Amount",
+        "debtAmount",
+        "contact.debt_amount"
+      ])),
+
+      agent: agentValue || "Unassigned",
+
+      callDirection: normalizeDirection(directionValue),
+      callStatus: normalizeStatus(statusValue),
+      callDurationRaw: durationValue,
+      callDurationSeconds: normalizeDuration(durationValue),
+      callStartTime: startTimeValue,
+      callEndTime: endTimeValue,
+      timeOfCall: timeOfCallValue,
       createdAt: new Date().toISOString()
     };
 
@@ -68,9 +197,9 @@ export default function handler(req, res) {
     stats.lastPayload = contact;
 
     stats.recentContacts.unshift(contact);
-    stats.recentContacts = stats.recentContacts.slice(0, 100);
+    stats.recentContacts = stats.recentContacts.slice(0, 150);
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, received: contact });
   }
 
   return res.status(200).json(stats);
