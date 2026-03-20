@@ -185,7 +185,7 @@
 
     .layout {
       display: grid;
-      grid-template-columns: 1.45fr 0.75fr;
+      grid-template-columns: 1.55fr 0.75fr;
       gap: 22px;
     }
 
@@ -212,13 +212,30 @@
       font-size: 13px;
     }
 
-    .table-wrap {
+    .table-scroll {
+      max-height: 620px;
+      overflow-y: auto;
       overflow-x: auto;
+    }
+
+    .table-scroll::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+
+    .table-scroll::-webkit-scrollbar-thumb {
+      background: #2d3d5a;
+      border-radius: 999px;
+    }
+
+    .table-scroll::-webkit-scrollbar-track {
+      background: rgba(255,255,255,0.03);
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
+      min-width: 1200px;
     }
 
     th, td {
@@ -236,6 +253,9 @@
       text-transform: uppercase;
       letter-spacing: .06em;
       background: rgba(255,255,255,0.02);
+      position: sticky;
+      top: 0;
+      z-index: 2;
     }
 
     tr:hover td {
@@ -520,10 +540,10 @@
       <div class="table-card">
         <div class="card-head">
           <h3>Recent Activity</h3>
-          <span>Auto refresh every 2 seconds</span>
+          <span>Scrollable call history • auto refresh every 2 seconds</span>
         </div>
 
-        <div class="table-wrap">
+        <div class="table-scroll">
           <table>
             <thead>
               <tr>
@@ -578,26 +598,6 @@
             </div>
           </div>
         </div>
-
-        <div class="side-card">
-          <h3>Latest Contact Snapshot</h3>
-          <div class="mini-list" id="latestCard">
-            <div class="mini-item">
-              <strong>No activity yet</strong>
-              <span>Once a webhook hits, the latest contact will appear here.</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="side-card">
-          <h3>Sub Account Feed</h3>
-          <div class="mini-list" id="subFeed">
-            <div class="mini-item">
-              <strong>No sub account yet</strong>
-              <span>Waiting for data from your locations.</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -619,7 +619,7 @@
 
       const str = String(value).trim();
 
-      if (/^\d+$/.test(str)) return Number(str);
+      if (/^\\d+$/.test(str)) return Number(str);
 
       if (str.includes(':')) {
         const parts = str.split(':').map(Number);
@@ -734,27 +734,6 @@
         });
       }
 
-      const latestCard = document.getElementById('latestCard');
-      if (!latest) {
-        latestCard.innerHTML = `
-          <div class="mini-item">
-            <strong>No activity yet</strong>
-            <span>Once a webhook hits, the latest contact will appear here.</span>
-          </div>
-        `;
-      } else {
-        latestCard.innerHTML = `
-          <div class="mini-item">
-            <strong>${formatSafe(latest.name, 'Unknown')}</strong>
-            <span>${formatSafe(latest.phone, 'No phone')} • ${formatSafe(latest.email, 'No email')}</span>
-          </div>
-          <div class="mini-item">
-            <strong>${formatSafe(latest.agent, 'Unassigned')}</strong>
-            <span>${formatSafe(latest.subAccount, 'Unknown')} • ${formatSafe(latest.debtAmount, '$0')} • ${formatSafe(latest.callStatus, 'No call status')} • ${formatSafe(latest.timeOfCall, 'N/A')}</span>
-          </div>
-        `;
-      }
-
       const agentMap = {};
       recentContacts.forEach(c => {
         const agent = formatSafe(c.agent, 'Unassigned');
@@ -833,25 +812,6 @@
             </div>
           `;
         }).join('');
-      }
-
-      const subFeed = document.getElementById('subFeed');
-      const uniqueSubs = [...new Set(recentContacts.map(c => c.subAccount).filter(Boolean))];
-
-      if (!uniqueSubs.length) {
-        subFeed.innerHTML = `
-          <div class="mini-item">
-            <strong>No sub account yet</strong>
-            <span>Waiting for data from your locations.</span>
-          </div>
-        `;
-      } else {
-        subFeed.innerHTML = uniqueSubs.map(sub => `
-          <div class="mini-item">
-            <strong>${sub}</strong>
-            <span>Recent activity detected from this location.</span>
-          </div>
-        `).join('');
       }
     }
 
