@@ -96,7 +96,7 @@
 
     .container {
       padding: 28px;
-      max-width: 1600px;
+      max-width: 1650px;
       margin: 0 auto;
     }
 
@@ -250,7 +250,9 @@
     .debt-pill,
     .agent-pill,
     .dir-pill,
-    .status-pill {
+    .status-pill,
+    .activity-pill,
+    .time-pill {
       display: inline-block;
       padding: 6px 10px;
       border-radius: 999px;
@@ -284,19 +286,28 @@
       color: #bfdbfe;
     }
 
-    .status-pill.good {
+    .time-pill {
+      background: rgba(255,255,255,0.06);
+      border-color: rgba(255,255,255,0.12);
+      color: var(--text);
+    }
+
+    .status-pill.good,
+    .activity-pill.good {
       background: rgba(34,197,94,0.12);
       border-color: rgba(34,197,94,0.25);
       color: #86efac;
     }
 
-    .status-pill.warn {
+    .status-pill.warn,
+    .activity-pill.warn {
       background: rgba(245,158,11,0.12);
       border-color: rgba(245,158,11,0.25);
       color: #fde68a;
     }
 
-    .status-pill.bad {
+    .status-pill.bad,
+    .activity-pill.bad {
       background: rgba(239,68,68,0.12);
       border-color: rgba(239,68,68,0.25);
       color: #fca5a5;
@@ -341,7 +352,7 @@
 
     .leaderboard-row {
       display: grid;
-      grid-template-columns: 1.1fr .55fr .55fr .55fr .7fr .7fr .7fr;
+      grid-template-columns: 1.1fr .55fr .55fr .55fr .7fr .7fr .7fr .7fr;
       gap: 10px;
       align-items: center;
       padding: 10px 0;
@@ -364,13 +375,23 @@
       color: var(--text);
     }
 
+    .activity-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+    }
+
     .empty {
       color: var(--muted);
       padding: 20px;
       text-align: center;
     }
 
-    @media (max-width: 1350px) {
+    @media (max-width: 1400px) {
       .stats-grid {
         grid-template-columns: repeat(3, 1fr);
       }
@@ -410,7 +431,8 @@
         font-size: 22px;
       }
 
-      .leaderboard-row {
+      .leaderboard-row,
+      .activity-row {
         grid-template-columns: 1fr;
         gap: 4px;
       }
@@ -430,7 +452,7 @@
       </div>
       <div class="brand-copy">
         <h1>My Credit Care Dashboard</h1>
-        <p>Level 3 leaderboard dashboard for calls, talk time, debt, and agent performance</p>
+        <p>Level 4 operations board for calls, talk time, debt, leaderboards, and agent activity</p>
       </div>
     </div>
 
@@ -443,10 +465,10 @@
   <div class="container">
     <div class="hero">
       <div class="hero-card">
-        <h2>Team Performance Overview</h2>
+        <h2>Operations Overview</h2>
         <p>
-          Track call volume, inbound vs outbound mix, answered calls, team talk time,
-          debt volume, and agent leaderboard performance in one place.
+          Track team volume, inbound vs outbound mix, answered calls, talk time, debt, top agents,
+          and current activity patterns across all MCC locations in one place.
         </p>
       </div>
 
@@ -459,7 +481,7 @@
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">Total Calls</div>
-        <div class="stat-value" id="totalEvents">0</div>
+        <div class="stat-value" id="totalCalls">0</div>
         <div class="stat-sub">All visible call events</div>
       </div>
 
@@ -483,7 +505,7 @@
 
       <div class="stat-card">
         <div class="stat-label">Team Talk Time</div>
-        <div class="stat-value" id="teamTalkTime">0m</div>
+        <div class="stat-value" id="teamTalkTime">0s</div>
         <div class="stat-sub">Total visible talk time</div>
       </div>
 
@@ -514,11 +536,12 @@
                 <th>Direction</th>
                 <th>Status</th>
                 <th>Duration</th>
+                <th>Time of Call</th>
               </tr>
             </thead>
             <tbody id="tableBody">
               <tr>
-                <td colspan="9" class="empty">Waiting for live activity...</td>
+                <td colspan="10" class="empty">Waiting for live activity...</td>
               </tr>
             </tbody>
           </table>
@@ -536,11 +559,22 @@
             <div>Talk</div>
             <div>Avg</div>
             <div>Last</div>
+            <div>Debt</div>
           </div>
           <div class="mini-list" id="leaderboard">
             <div class="mini-item">
               <strong>No agent data yet</strong>
               <span>Waiting for call activity.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <h3>Agent Activity Board</h3>
+          <div class="mini-list" id="activityBoard">
+            <div class="mini-item">
+              <strong>No activity yet</strong>
+              <span>Agents will show here after calls are logged.</span>
             </div>
           </div>
         </div>
@@ -585,7 +619,7 @@
 
       const str = String(value).trim();
 
-      if (/^\\d+$/.test(str)) return Number(str);
+      if (/^\d+$/.test(str)) return Number(str);
 
       if (str.includes(':')) {
         const parts = str.split(':').map(Number);
@@ -628,6 +662,18 @@
       return 'warn';
     }
 
+    function activityStatus(lastSeenIso) {
+      if (!lastSeenIso) return { label: 'Idle', cls: 'bad' };
+
+      const now = new Date().getTime();
+      const seen = new Date(lastSeenIso).getTime();
+      const diffMinutes = (now - seen) / 60000;
+
+      if (diffMinutes <= 10) return { label: 'Hot', cls: 'good' };
+      if (diffMinutes <= 30) return { label: 'Warm', cls: 'warn' };
+      return { label: 'Idle', cls: 'bad' };
+    }
+
     async function loadData() {
       const res = await fetch('/api/ghl');
       const data = await res.json();
@@ -651,7 +697,7 @@
       const visibleDebtTotal = recentContacts.reduce((sum, c) => sum + parseDebt(c.debtAmount), 0);
       const teamTalkSeconds = recentContacts.reduce((sum, c) => sum + parseDuration(c.callDurationRaw || c.callDurationSeconds || c.callDuration), 0);
 
-      document.getElementById('totalEvents').innerText = data.totalEvents || 0;
+      document.getElementById('totalCalls').innerText = recentContacts.length;
       document.getElementById('inboundCount').innerText = inboundCount;
       document.getElementById('outboundCount').innerText = outboundCount;
       document.getElementById('answeredCount').innerText = answeredCount;
@@ -665,7 +711,7 @@
       if (!recentContacts.length) {
         table.innerHTML = `
           <tr>
-            <td colspan="9" class="empty">Waiting for live activity...</td>
+            <td colspan="10" class="empty">Waiting for live activity...</td>
           </tr>
         `;
       } else {
@@ -681,6 +727,7 @@
               <td><span class="dir-pill">${formatSafe(c.callDirection, 'N/A')}</span></td>
               <td><span class="status-pill ${statusClass(c.callStatus)}">${formatSafe(c.callStatus, 'N/A')}</span></td>
               <td>${formatDuration(parseDuration(c.callDurationRaw || c.callDurationSeconds || c.callDuration))}</td>
+              <td><span class="time-pill">${formatSafe(c.timeOfCall, 'N/A')}</span></td>
             </tr>
           `;
           table.innerHTML += row;
@@ -703,7 +750,7 @@
           </div>
           <div class="mini-item">
             <strong>${formatSafe(latest.agent, 'Unassigned')}</strong>
-            <span>${formatSafe(latest.subAccount, 'Unknown')} • ${formatSafe(latest.debtAmount, '$0')} • ${formatSafe(latest.callStatus, 'No call status')}</span>
+            <span>${formatSafe(latest.subAccount, 'Unknown')} • ${formatSafe(latest.debtAmount, '$0')} • ${formatSafe(latest.callStatus, 'No call status')} • ${formatSafe(latest.timeOfCall, 'N/A')}</span>
           </div>
         `;
       }
@@ -722,7 +769,8 @@
             outbound: 0,
             totalTalk: 0,
             lastCall: 0,
-            debt: 0
+            debt: 0,
+            lastSeen: c.createdAt || null
           };
         }
 
@@ -732,6 +780,9 @@
         agentMap[agent].totalTalk += duration;
         agentMap[agent].lastCall = duration;
         agentMap[agent].debt += debt;
+        if (!agentMap[agent].lastSeen || new Date(c.createdAt) > new Date(agentMap[agent].lastSeen)) {
+          agentMap[agent].lastSeen = c.createdAt;
+        }
       });
 
       const leaderboardData = Object.entries(agentMap)
@@ -757,6 +808,28 @@
               <div>${formatDuration(info.totalTalk)}</div>
               <div>${formatDuration(avg)}</div>
               <div>${formatDuration(info.lastCall)}</div>
+              <div>${formatMoney(info.debt)}</div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const activityBoard = document.getElementById('activityBoard');
+      if (!leaderboardData.length) {
+        activityBoard.innerHTML = `
+          <div class="mini-item">
+            <strong>No activity yet</strong>
+            <span>Agents will show here after calls are logged.</span>
+          </div>
+        `;
+      } else {
+        activityBoard.innerHTML = leaderboardData.map(([agent, info]) => {
+          const state = activityStatus(info.lastSeen);
+          return `
+            <div class="activity-row">
+              <div class="leaderboard-name">${agent}</div>
+              <div><span class="activity-pill ${state.cls}">${state.label}</span></div>
+              <div>${formatDuration(info.totalTalk)}</div>
             </div>
           `;
         }).join('');
