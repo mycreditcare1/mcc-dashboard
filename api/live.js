@@ -1,3 +1,9 @@
+const EXCLUDED_USERS = [
+  "Aubrey Lobitana",
+  "Eunice Alacron",
+  "Joilyn Calan"
+];
+
 const LOCATIONS = [
   {
     name: "CAR 1",
@@ -58,6 +64,15 @@ function getUsers(data) {
   if (Array.isArray(data.results)) return data.results;
   if (Array.isArray(data)) return data;
   return [];
+}
+
+function getUserName(user) {
+  return (
+    user.name ||
+    `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+    user.email ||
+    "Unknown User"
+  );
 }
 
 function normalizeConversation(conversation, locationName) {
@@ -149,18 +164,16 @@ export default async function handler(req, res) {
         normalizeConversation(c, location.name)
       );
 
-      const users = getUsers(usersResponse.data).map(user => ({
-        id: user.id || user._id || "",
-        name:
-          user.name ||
-          `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-          user.email ||
-          "Unknown User",
-        email: user.email || "",
-        phone: user.phone || "",
-        location: location.name,
-        status: "Connected"
-      }));
+      const users = getUsers(usersResponse.data)
+        .filter(user => !EXCLUDED_USERS.includes(getUserName(user)))
+        .map(user => ({
+          id: user.id || user._id || "",
+          name: getUserName(user),
+          email: user.email || "",
+          phone: user.phone || "",
+          location: location.name,
+          status: "Connected"
+        }));
 
       allLocations.push({
         name: location.name,
