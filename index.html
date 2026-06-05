@@ -103,7 +103,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(8, 1fr);
+      grid-template-columns: repeat(11, 1fr);
       gap: 16px;
       margin-bottom: 22px;
     }
@@ -399,7 +399,7 @@
 
       <div class="brand-copy">
         <h1>My Credit Care Dashboard</h1>
-        <p>Level 5 call center operations board</p>
+        <p>Live Operations Dashboard</p>
       </div>
     </div>
 
@@ -449,6 +449,21 @@
       <div class="stat-card">
         <div class="stat-label">Debt Total</div>
         <div class="stat-value" id="debtTotal">$0</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Avg Debt</div>
+        <div class="stat-value" id="avgDebt">$0</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Highest Debt</div>
+        <div class="stat-value" id="highestDebt">$0</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Inbound %</div>
+        <div class="stat-value" id="inboundRate">0%</div>
       </div>
     </div>
 
@@ -504,16 +519,6 @@
             <div class="mini-item">
               <strong>No agent data yet</strong>
               <span>Waiting for call activity.</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="side-card">
-          <h3>CAR Team Comparison</h3>
-          <div class="mini-list" id="locationBoard">
-            <div class="mini-item">
-              <strong>No team data yet</strong>
-              <span>Waiting for calls.</span>
             </div>
           </div>
         </div>
@@ -681,6 +686,23 @@
         return sum + parseDebt(call.debtAmount);
       }, 0);
 
+      const avgDebt = total > 0
+        ? debtTotal / total
+        : 0;
+
+      const highestDebt = Math.max(
+        ...calls.map(call => parseDebt(call.debtAmount)),
+        0
+      );
+
+      const inboundCount = calls.filter(call => {
+        return String(call.callDirection || '').toLowerCase().includes('inbound');
+      }).length;
+
+      const inboundRate = total > 0
+        ? ((inboundCount / total) * 100).toFixed(1)
+        : '0.0';
+
       document.getElementById('totalCalls').innerText = total;
       document.getElementById('answeredCount').innerText = answered;
       document.getElementById('missedCount').innerText = missed;
@@ -689,10 +711,12 @@
       document.getElementById('avgCallLength').innerText = duration(avgCallSeconds);
       document.getElementById('teamTalkTime').innerText = duration(teamTalkSeconds);
       document.getElementById('debtTotal').innerText = money(debtTotal);
+      document.getElementById('avgDebt').innerText = money(avgDebt);
+      document.getElementById('highestDebt').innerText = money(highestDebt);
+      document.getElementById('inboundRate').innerText = inboundRate + '%';
 
       renderTable(calls);
       renderAgentLeaderboard(calls);
-      renderLocationBoard(calls);
       renderHourlyBoard(calls);
       renderActivityFeed(calls);
     }
@@ -783,53 +807,6 @@
             <div>${duration(stats.talk)}</div>
             <div>${duration(avg)}</div>
             <div>${money(stats.debt)}</div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderLocationBoard(calls) {
-      const locations = {};
-
-      calls.forEach(call => {
-        const location = safe(call.subAccount, 'Unknown');
-        const callDuration = parseDuration(call.callDurationRaw || call.callDurationSeconds || call.callDuration);
-
-        if (!locations[location]) {
-          locations[location] = {
-            calls: 0,
-            answered: 0,
-            missed: 0,
-            voicemail: 0,
-            talk: 0
-          };
-        }
-
-        locations[location].calls += 1;
-        if (isAnswered(call)) locations[location].answered += 1;
-        if (isMissed(call)) locations[location].missed += 1;
-        if (isVoicemail(call)) locations[location].voicemail += 1;
-        locations[location].talk += callDuration;
-      });
-
-      const board = document.getElementById('locationBoard');
-      const rows = Object.entries(locations).sort((a, b) => b[1].calls - a[1].calls);
-
-      if (!rows.length) {
-        board.innerHTML = `
-          <div class="mini-item">
-            <strong>No team data yet</strong>
-            <span>Waiting for calls.</span>
-          </div>
-        `;
-        return;
-      }
-
-      board.innerHTML = rows.map(([location, stats]) => {
-        return `
-          <div class="mini-item">
-            <strong>${location}</strong>
-            <span>${stats.calls} calls • ${stats.answered} answered • ${stats.missed} missed • ${stats.voicemail} VM • ${duration(stats.talk)} talk</span>
           </div>
         `;
       }).join('');
