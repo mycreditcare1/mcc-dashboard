@@ -75,18 +75,38 @@ function getUserName(user) {
   );
 }
 
+function cleanDirection(value) {
+  const direction = String(value || "").toLowerCase();
+
+  if (direction === "inbound") return "Inbound";
+  if (direction === "outbound") return "Outbound";
+
+  return "N/A";
+}
+
+function normalizeStatus(typeValue, directionValue, bodyValue) {
+  const type = String(typeValue || "").toUpperCase();
+  const direction = cleanDirection(directionValue);
+  const body = String(bodyValue || "").toLowerCase();
+
+  if (body.includes("missed call")) return "Missed Call Follow-Up";
+  if (body.includes("voicemail") || body.includes("voice mail")) return "Voicemail";
+
+  if (type === "TYPE_CALL") return `Call ${direction}`;
+  if (type === "TYPE_SMS") return `SMS ${direction}`;
+  if (type === "TYPE_EMAIL") return `Email ${direction}`;
+  if (type === "TYPE_CAMPAIGN_VOICEMAIL") return "Campaign Voicemail";
+
+  return direction !== "N/A" ? direction : "Activity";
+}
+
 function normalizeConversation(conversation, locationName) {
-  const type = String(conversation.lastMessageType || "").toLowerCase();
-  const direction = String(conversation.lastMessageDirection || "").toLowerCase();
-  const body = String(conversation.lastMessageBody || "").toLowerCase();
-
-  let status = "Activity";
-
-  if (type.includes("call")) status = "Call";
-  if (body.includes("missed call")) status = "Missed";
-  if (body.includes("voicemail") || body.includes("voice mail")) status = "Voicemail";
-  if (direction === "outbound") status = "Outbound";
-  if (direction === "inbound") status = "Inbound";
+  const direction = cleanDirection(conversation.lastMessageDirection);
+  const status = normalizeStatus(
+    conversation.lastMessageType,
+    conversation.lastMessageDirection,
+    conversation.lastMessageBody
+  );
 
   return {
     id: conversation.id || "",
@@ -100,7 +120,7 @@ function normalizeConversation(conversation, locationName) {
     phone: conversation.phone || "",
     email: conversation.email || "",
     assignedTo: conversation.assignedTo || "",
-    direction: direction ? direction.charAt(0).toUpperCase() + direction.slice(1) : "N/A",
+    direction,
     type: conversation.lastMessageType || "N/A",
     status,
     lastMessage: conversation.lastMessageBody || "",
