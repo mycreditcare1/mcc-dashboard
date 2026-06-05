@@ -42,67 +42,55 @@ async function ghlRequest(apiKey, path) {
   };
 }
 
-function extractUsers(data) {
-  if (!data) return [];
-
-  if (Array.isArray(data.users)) return data.users;
-  if (Array.isArray(data.data)) return data.data;
-  if (Array.isArray(data.results)) return data.results;
-  if (Array.isArray(data)) return data;
-
-  return [];
-}
-
 export default async function handler(req, res) {
   try {
     const results = [];
 
     for (const location of LOCATIONS) {
-      if (!location.apiKey || !location.locationId) {
-        results.push({
-          location: location.name,
-          connected: false,
-          error: "Missing API key or Location ID in Vercel environment variables",
-          agents: []
-        });
+      const checks = {};
 
-        continue;
-      }
-
-      const userResponse = await ghlRequest(
+      checks.locationInfo = await ghlRequest(
         location.apiKey,
-        `/users/search?locationId=${location.locationId}`
+        `/locations/${location.locationId}`
       );
 
-      const users = extractUsers(userResponse.data);
+      checks.usersByLocation = await ghlRequest(
+        location.apiKey,
+        `/users/?locationId=${location.locationId}`
+      );
+
+      checks.conversations = await ghlRequest(
+        location.apiKey,
+        `/conversations/search?locationId=${location.locationId}&limit=5`
+      );
 
       results.push({
         location: location.name,
         locationId: location.locationId,
-        connected: userResponse.ok,
-        statusCode: userResponse.status,
-        agents: users.map(user => ({
-          id: user.id || user._id || "",
-          name:
-            user.name ||
-            user.fullName ||
-            `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-            user.email ||
-            "Unknown User",
-          email: user.email || "",
-          phone: user.phone || "",
-          status: "API Connected",
-          livePhoneStatus: "Testing"
-        })),
-        rawCount: users.length,
-        raw: userResponse.ok ? undefined : userResponse.data
+        checks: {
+          locationInfo: {
+            ok: checks.locationInfo.ok,
+            status: checks.locationInfo.status,
+            data: checks.locationInfo.data
+          },
+          usersByLocation: {
+            ok: checks.usersByLocation.ok,
+            status: checks.usersByLocation.status,
+            data: checks.usersByLocation.data
+          },
+          conversations: {
+            ok: checks.conversations.ok,
+            status: checks.conversations.status,
+            data: checks.conversations.data
+          }
+        }
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "Live API test complete",
-      locations: results
+      message: "Live API endpoint test complete",
+      results
     });
   } catch (error) {
     return res.status(500).json({
