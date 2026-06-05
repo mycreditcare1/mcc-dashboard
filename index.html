@@ -307,7 +307,7 @@
 
     .leaderboard-row {
       display: grid;
-      grid-template-columns: 1.2fr 0.5fr 0.5fr 0.5fr 0.5fr 0.65fr 0.65fr 0.65fr;
+      grid-template-columns: 1.5fr 0.5fr 0.5fr 0.5fr 0.5fr 0.6fr 0.8fr 0.8fr 0.8fr 1fr;
       gap: 10px;
       align-items: center;
       padding: 10px 0;
@@ -506,12 +506,14 @@
 
           <div class="leaderboard-head leaderboard-row">
             <div>Agent</div>
-            <div>Calls</div>
+            <div>In</div>
+            <div>Out</div>
             <div>Ans</div>
             <div>Miss</div>
-            <div>VM</div>
+            <div>Ans%</div>
             <div>Talk</div>
             <div>Avg</div>
+            <div>Long</div>
             <div>Debt</div>
           </div>
 
@@ -798,25 +800,48 @@
 
       calls.forEach(call => {
         const agent = safe(call.agent, 'Unassigned');
-        const callDuration = parseDuration(call.callDurationRaw || call.callDurationSeconds || call.callDuration);
+        const callDuration = parseDuration(
+          call.callDurationRaw ||
+          call.callDurationSeconds ||
+          call.callDuration
+        );
+
+        const direction = String(call.callDirection || '').toLowerCase();
 
         if (!agents[agent]) {
           agents[agent] = {
-            calls: 0,
+            inbound: 0,
+            outbound: 0,
             answered: 0,
             missed: 0,
-            voicemail: 0,
             talk: 0,
-            debt: 0
+            debt: 0,
+            longestCall: 0
           };
         }
 
-        agents[agent].calls += 1;
-        if (isAnswered(call)) agents[agent].answered += 1;
-        if (isMissed(call)) agents[agent].missed += 1;
-        if (isVoicemail(call)) agents[agent].voicemail += 1;
+        if (direction.includes('inbound')) {
+          agents[agent].inbound += 1;
+        }
+
+        if (direction.includes('outbound')) {
+          agents[agent].outbound += 1;
+        }
+
+        if (isAnswered(call)) {
+          agents[agent].answered += 1;
+        }
+
+        if (isMissed(call)) {
+          agents[agent].missed += 1;
+        }
+
         agents[agent].talk += callDuration;
         agents[agent].debt += parseDebt(call.debtAmount);
+
+        if (callDuration > agents[agent].longestCall) {
+          agents[agent].longestCall = callDuration;
+        }
       });
 
       const rows = Object.entries(agents).sort((a, b) => b[1].talk - a[1].talk);
@@ -837,15 +862,21 @@
           ? Math.round(stats.talk / stats.answered)
           : 0;
 
+        const answerRate = stats.inbound > 0
+          ? Math.round((stats.answered / stats.inbound) * 100)
+          : 0;
+
         return `
           <div class="leaderboard-row">
             <div class="leaderboard-name">${agent}</div>
-            <div>${stats.calls}</div>
+            <div>${stats.inbound}</div>
+            <div>${stats.outbound}</div>
             <div>${stats.answered}</div>
             <div>${stats.missed}</div>
-            <div>${stats.voicemail}</div>
+            <div>${answerRate}%</div>
             <div>${duration(stats.talk)}</div>
             <div>${duration(avg)}</div>
+            <div>${duration(stats.longestCall)}</div>
             <div>${money(stats.debt)}</div>
           </div>
         `;
