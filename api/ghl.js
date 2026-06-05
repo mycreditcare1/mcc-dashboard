@@ -13,7 +13,6 @@ function normalizeDebt(value) {
 
 function normalizeDuration(value) {
   if (value === null || value === undefined || value === "") return 0;
-
   if (typeof value === "number") return value;
 
   const str = String(value).trim();
@@ -24,13 +23,8 @@ function normalizeDuration(value) {
     const parts = str.split(":").map(Number);
     if (parts.some(Number.isNaN)) return 0;
 
-    if (parts.length === 3) {
-      return parts[0] * 3600 + parts[1] * 60 + parts[2];
-    }
-
-    if (parts.length === 2) {
-      return parts[0] * 60 + parts[1];
-    }
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
   }
 
   return 0;
@@ -47,20 +41,17 @@ function getValue(body, keys = []) {
     if (key.includes(".")) {
       const parts = key.split(".");
       let current = body;
-      let found = true;
 
       for (const part of parts) {
         if (current && Object.prototype.hasOwnProperty.call(current, part)) {
           current = current[part];
         } else {
-          found = false;
+          current = undefined;
           break;
         }
       }
 
-      if (found && current !== undefined && current !== null && current !== "") {
-        return current;
-      }
+      if (current !== undefined && current !== null && current !== "") return current;
     } else if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
       return body[key];
     }
@@ -72,13 +63,8 @@ function getValue(body, keys = []) {
 function normalizeDirection(value) {
   const str = String(value || "").toLowerCase();
 
-  if (str.includes("inbound") || str === "in" || str === "inbound_call") {
-    return "Inbound";
-  }
-
-  if (str.includes("outbound") || str === "out" || str === "outbound_call") {
-    return "Outbound";
-  }
+  if (str.includes("inbound") || str === "in" || str === "inbound_call") return "Inbound";
+  if (str.includes("outbound") || str === "out" || str === "outbound_call") return "Outbound";
 
   return "";
 }
@@ -87,11 +73,14 @@ function normalizeStatus(value) {
   const str = String(value || "").toLowerCase();
 
   if (!str) return "";
-  if (str.includes("answered")) return "Answered";
   if (str.includes("complete")) return "Completed";
-  if (str.includes("miss")) return "Missed";
+  if (str.includes("answered")) return "Answered";
+  if (str.includes("voicemail")) return "Voicemail";
+  if (str.includes("no-answer")) return "No Answer";
   if (str.includes("no answer")) return "No Answer";
   if (str.includes("busy")) return "Busy";
+  if (str.includes("cancel")) return "Canceled";
+  if (str.includes("miss")) return "Missed";
   if (str.includes("fail")) return "Failed";
 
   return titleCase(value);
@@ -100,15 +89,21 @@ function normalizeStatus(value) {
 export default function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
-    const customData = body.customData || {};
 
     stats.totalEvents += 1;
 
     const locationValue = getValue(body, [
       "location.name",
+      "customData.Location",
       "location",
       "Sub Account",
       "subAccount"
+    ]);
+
+    const locationIdValue = getValue(body, [
+      "customData.Location ID",
+      "Location ID",
+      "location.id"
     ]);
 
     const directionValue = getValue(body, [
@@ -166,11 +161,22 @@ export default function handler(req, res) {
       "customData.Agent",
       "Agent",
       "agent",
-      "phoneCall.answeredBy.user.name",
+      "phoneCall.answeredBy.user.name"
+    ]);
+
+    const callUserValue = getValue(body, [
+      "customData.Call User",
+      "Call User",
+      "callUser",
       "phoneCall.user.name",
-      "assigned_to",
-      "assignedTo",
       "userName"
+    ]);
+
+    const debtAmountValue = getValue(body, [
+      "customData.Debt Amount",
+      "Debt Amount",
+      "debtAmount",
+      "contact.debt_amount"
     ]);
 
     const contact = {
@@ -195,19 +201,13 @@ export default function handler(req, res) {
           ? locationValue.name || ""
           : locationValue || "",
 
-      debtAmount: getValue(body, [
-        "Debt Amount",
-        "debtAmount",
-        "contact.debt_amount"
-      ]),
+      locationId: locationIdValue,
 
-      debtValue: normalizeDebt(getValue(body, [
-        "Debt Amount",
-        "debtAmount",
-        "contact.debt_amount"
-      ])),
+      debtAmount: debtAmountValue,
+      debtValue: normalizeDebt(debtAmountValue),
 
-      agent: agentValue || "Unassigned",
+      agent: agentValue || callUserValue || "Unassigned",
+      callUser: callUserValue,
 
       callDirection: normalizeDirection(directionValue),
       callStatus: normalizeStatus(statusValue),
@@ -216,6 +216,7 @@ export default function handler(req, res) {
       callStartTime: startTimeValue,
       callEndTime: endTimeValue,
       timeOfCall: timeOfCallValue,
+
       createdAt: new Date().toISOString()
     };
 
