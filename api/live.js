@@ -42,55 +42,152 @@ async function ghlRequest(apiKey, path) {
   };
 }
 
+function getConversations(data) {
+  if (!data) return [];
+  if (Array.isArray(data.conversations)) return data.conversations;
+  if (Array.isArray(data.data)) return data.data;
+  if (Array.isArray(data.results)) return data.results;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+function getUsers(data) {
+  if (!data) return [];
+  if (Array.isArray(data.users)) return data.users;
+  if (Array.isArray(data.data)) return data.data;
+  if (Array.isArray(data.results)) return data.results;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+function normalizeConversation(conversation, locationName) {
+  const type = String(conversation.lastMessageType || "").toLowerCase();
+  const direction = String(conversation.lastMessageDirection || "").toLowerCase();
+  const body = String(conversation.lastMessageBody || "").toLowerCase();
+
+  let status = "Activity";
+
+  if (type.includes("call")) status = "Call";
+  if (body.includes("missed call")) status = "Missed";
+  if (body.includes("voicemail") || body.includes("voice mail")) status = "Voicemail";
+  if (direction === "outbound") status = "Outbound";
+  if (direction === "inbound") status = "Inbound";
+
+  return {
+    id: conversation.id || "",
+    location: locationName,
+    contactName:
+      conversation.fullName ||
+      conversation.contactName ||
+      conversation.phone ||
+      conversation.email ||
+      "Unknown",
+    phone: conversation.phone || "",
+    email: conversation.email || "",
+    assignedTo: conversation.assignedTo || "",
+    direction: direction ? direction.charAt(0).toUpperCase() + direction.slice(1) : "N/A",
+    type: conversation.lastMessageType || "N/A",
+    status,
+    lastMessage: conversation.lastMessageBody || "",
+    lastMessageDate: conversation.lastMessageDate || conversation.dateUpdated || conversation.dateAdded || null,
+    unreadCount: conversation.unreadCount || 0
+  };
+}
+
+function summarize(conversations) {
+  const total = conversations.length;
+
+  const inbound = conversations.filter(c =>
+    String(c.direction).toLowerCase().includes("inbound")
+  ).length;
+
+  const outbound = conversations.filter(c =>
+    String(c.direction).toLowerCase().includes("outbound")
+  ).length;
+
+  const missed = conversations.filter(c =>
+    String(c.status).toLowerCase().includes("missed") ||
+    String(c.lastMessage).toLowerCase().includes("missed call")
+  ).length;
+
+  const voicemail = conversations.filter(c =>
+    String(c.status).toLowerCase().includes("voicemail") ||
+    String(c.lastMessage).toLowerCase().includes("voicemail") ||
+    String(c.lastMessage).toLowerCase().includes("voice mail")
+  ).length;
+
+  const unread = conversations.reduce((sum, c) => sum + Number(c.unreadCount || 0), 0);
+
+  return {
+    totalRecentActivity: total,
+    inbound,
+    outbound,
+    missed,
+    voicemail,
+    unread
+  };
+}
+
 export default async function handler(req, res) {
   try {
-    const results = [];
+    const allLocations = [];
+    const allConversations = [];
+    const allUsers = [];
 
     for (const location of LOCATIONS) {
-      const checks = {};
-
-      checks.locationInfo = await ghlRequest(
+      const conversationsResponse = await ghlRequest(
         location.apiKey,
-        `/locations/${location.locationId}`
+        `/conversations/search?locationId=${location.locationId}&limit=25`
       );
 
-      checks.usersByLocation = await ghlRequest(
+      const usersResponse = await ghlRequest(
         location.apiKey,
         `/users/?locationId=${location.locationId}`
       );
 
-      checks.conversations = await ghlRequest(
-        location.apiKey,
-        `/conversations/search?locationId=${location.locationId}&limit=5`
+      const conversations = getConversations(conversationsResponse.data).map(c =>
+        normalizeConversation(c, location.name)
       );
 
-      results.push({
+      const users = getUsers(usersResponse.data).map(user => ({
+        id: user.id || user._id || "",
+        name:
+          user.name ||
+          `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+          user.email ||
+          "Unknown User",
+        email: user.email || "",
+        phone: user.phone || "",
         location: location.name,
+        status: "Connected"
+      }));
+
+      allLocations.push({
+        name: location.name,
         locationId: location.locationId,
-        checks: {
-          locationInfo: {
-            ok: checks.locationInfo.ok,
-            status: checks.locationInfo.status,
-            data: checks.locationInfo.data
-          },
-          usersByLocation: {
-            ok: checks.usersByLocation.ok,
-            status: checks.usersByLocation.status,
-            data: checks.usersByLocation.data
-          },
-          conversations: {
-            ok: checks.conversations.ok,
-            status: checks.conversations.status,
-            data: checks.conversations.data
-          }
-        }
+        conversationsConnected: conversationsResponse.ok,
+        conversationsStatus: conversationsResponse.status,
+        usersConnected: usersResponse.ok,
+        usersStatus: usersResponse.status,
+        recentActivityCount: conversations.length,
+        userCount: users.length
       });
+
+      allConversations.push(...conversations);
+      allUsers.push(...users);
     }
+
+    allConversations.sort((a, b) => {
+      return Number(b.lastMessageDate || 0) - Number(a.lastMessageDate || 0);
+    });
 
     return res.status(200).json({
       success: true,
-      message: "Live API endpoint test complete",
-      results
+      message: "Live operations feed",
+      summary: summarize(allConversations),
+      locations: allLocations,
+      agents: allUsers,
+      activity: allConversations.slice(0, 50)
     });
   } catch (error) {
     return res.status(500).json({
