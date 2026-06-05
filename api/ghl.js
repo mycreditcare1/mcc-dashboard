@@ -51,7 +51,9 @@ function getValue(body, keys = []) {
         }
       }
 
-      if (current !== undefined && current !== null && current !== "") return current;
+      if (current !== undefined && current !== null && current !== "") {
+        return current;
+      }
     } else if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
       return body[key];
     }
@@ -63,8 +65,23 @@ function getValue(body, keys = []) {
 function normalizeDirection(value) {
   const str = String(value || "").toLowerCase();
 
-  if (str.includes("inbound") || str === "in" || str === "inbound_call") return "Inbound";
-  if (str.includes("outbound") || str === "out" || str === "outbound_call") return "Outbound";
+  if (
+    str.includes("inbound") ||
+    str === "in" ||
+    str === "inbound_call" ||
+    str === "incoming"
+  ) {
+    return "Inbound";
+  }
+
+  if (
+    str.includes("outbound") ||
+    str === "out" ||
+    str === "outbound_call" ||
+    str === "outgoing"
+  ) {
+    return "Outbound";
+  }
 
   return "";
 }
@@ -76,6 +93,7 @@ function normalizeStatus(value) {
   if (str.includes("complete")) return "Completed";
   if (str.includes("answered")) return "Answered";
   if (str.includes("voicemail")) return "Voicemail";
+  if (str.includes("voice mail")) return "Voicemail";
   if (str.includes("no-answer")) return "No Answer";
   if (str.includes("no answer")) return "No Answer";
   if (str.includes("busy")) return "Busy";
@@ -84,6 +102,15 @@ function normalizeStatus(value) {
   if (str.includes("fail")) return "Failed";
 
   return titleCase(value);
+}
+
+function displayLocationName(value) {
+  const raw =
+    value && typeof value === "object"
+      ? value.name || ""
+      : value || "";
+
+  return String(raw).trim();
 }
 
 export default function handler(req, res) {
@@ -183,7 +210,8 @@ export default function handler(req, res) {
       name: getValue(body, [
         "full_name",
         "fullName",
-        "contact.full_name"
+        "contact.full_name",
+        "first_name"
       ]) || "Unknown",
 
       phone: getValue(body, [
@@ -196,14 +224,11 @@ export default function handler(req, res) {
         "contact.email"
       ]),
 
-      subAccount:
-        locationValue && typeof locationValue === "object"
-          ? locationValue.name || ""
-          : locationValue || "",
+      subAccount: displayLocationName(locationValue) || "Unknown",
 
       locationId: locationIdValue,
 
-      debtAmount: debtAmountValue,
+      debtAmount: debtAmountValue || "$0",
       debtValue: normalizeDebt(debtAmountValue),
 
       agent: agentValue || callUserValue || "Unassigned",
@@ -224,9 +249,14 @@ export default function handler(req, res) {
     stats.lastPayload = contact;
 
     stats.recentContacts.unshift(contact);
-    stats.recentContacts = stats.recentContacts.slice(0, 150);
 
-    return res.status(200).json({ success: true, received: contact });
+    // Keep more calls so you can review full-day activity.
+    stats.recentContacts = stats.recentContacts.slice(0, 1000);
+
+    return res.status(200).json({
+      success: true,
+      received: contact
+    });
   }
 
   return res.status(200).json(stats);
