@@ -534,11 +534,31 @@
         </div>
 
         <div class="side-card">
-          <h3>Live Activity Feed</h3>
+          <h3>Webhook Activity Feed</h3>
           <div class="mini-list" id="activityFeed">
             <div class="mini-item">
               <strong>No activity yet</strong>
               <span>Waiting for calls.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <h3>Live Agent Status</h3>
+          <div class="mini-list" id="liveAgents">
+            <div class="mini-item">
+              <strong>Loading...</strong>
+              <span>Checking CAR locations...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="side-card">
+          <h3>Live GHL Activity</h3>
+          <div class="mini-list" id="liveActivity">
+            <div class="mini-item">
+              <strong>Loading...</strong>
+              <span>Checking recent GHL activity...</span>
             </div>
           </div>
         </div>
@@ -657,7 +677,22 @@
       const res = await fetch('/api/ghl');
       const data = await res.json();
 
-      const calls = Array.isArray(data.recentContacts) ? data.recentContacts : [];
+      const allCalls = Array.isArray(data.recentContacts) ? data.recentContacts : [];
+
+      // Level 6: Dashboard stats only show today's activity in Pacific Time.
+      const todayKey = new Date().toLocaleDateString('en-US', {
+        timeZone: 'America/Los_Angeles'
+      });
+
+      const calls = allCalls.filter(call => {
+        if (!call.createdAt) return true;
+
+        const callDate = new Date(call.createdAt).toLocaleDateString('en-US', {
+          timeZone: 'America/Los_Angeles'
+        });
+
+        return callDate === todayKey;
+      });
 
       const total = calls.length;
       const answered = calls.filter(isAnswered).length;
@@ -875,8 +910,120 @@
       }).join('');
     }
 
-    setInterval(loadData, 2000);
+    async function loadLiveData() {
+      try {
+        const res = await fetch('/api/live');
+        const live = await res.json();
+
+        renderLiveAgents(live.agents || []);
+        renderLiveActivity(live.activity || [], live.summary || {});
+      } catch (error) {
+        const agents = document.getElementById('liveAgents');
+        const activity = document.getElementById('liveActivity');
+
+        if (agents) {
+          agents.innerHTML = `
+            <div class="mini-item">
+              <strong>Live API error</strong>
+              <span>${error.message}</span>
+            </div>
+          `;
+        }
+
+        if (activity) {
+          activity.innerHTML = `
+            <div class="mini-item">
+              <strong>Live activity unavailable</strong>
+              <span>${error.message}</span>
+            </div>
+          `;
+        }
+      }
+    }
+
+    function renderLiveAgents(agents) {
+      const container = document.getElementById('liveAgents');
+
+      if (!container) return;
+
+      const uniqueAgents = [];
+      const seen = new Set();
+
+      agents.forEach(agent => {
+        const key = agent.id || agent.email || `${agent.name}-${agent.location}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueAgents.push(agent);
+        }
+      });
+
+      if (!uniqueAgents.length) {
+        container.innerHTML = `
+          <div class="mini-item">
+            <strong>No live agents found</strong>
+            <span>CAR accounts are connected, but no agents were returned.</span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = uniqueAgents.map(agent => `
+        <div class="mini-item">
+          <strong>${safe(agent.name, 'Unknown Agent')}</strong>
+          <span>${safe(agent.location, 'Unknown')} • 🟢 Connected</span>
+        </div>
+      `).join('');
+    }
+
+    function liveDate(value) {
+      const num = Number(value || 0);
+      if (!num) return 'N/A';
+
+      return new Date(num).toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
+    function renderLiveActivity(activity, summary) {
+      const container = document.getElementById('liveActivity');
+
+      if (!container) return;
+
+      if (!activity.length) {
+        container.innerHTML = `
+          <div class="mini-item">
+            <strong>No live GHL activity</strong>
+            <span>Waiting for recent conversations.</span>
+          </div>
+        `;
+        return;
+      }
+
+      const summaryItem = `
+        <div class="mini-item">
+          <strong>Recent GHL Activity</strong>
+          <span>${summary.totalRecentActivity || 0} recent • ${summary.inbound || 0} inbound • ${summary.outbound || 0} outbound • ${summary.unread || 0} unread</span>
+        </div>
+      `;
+
+      const rows = activity.slice(0, 10).map(item => `
+        <div class="mini-item feed-item">
+          <strong>${liveDate(item.lastMessageDate)} • ${safe(item.status, 'Activity')}</strong>
+          <span>${safe(item.contactName, 'Unknown')} • ${safe(item.location, 'N/A')} • ${safe(item.direction, 'N/A')}</span>
+        </div>
+      `).join('');
+
+      container.innerHTML = summaryItem + rows;
+    }
+
+    setInterval(() => {
+      loadData();
+      loadLiveData();
+    }, 5000);
+
     loadData();
+    loadLiveData();
   </script>
 </body>
 </html>
