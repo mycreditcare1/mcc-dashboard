@@ -534,21 +534,11 @@
         </div>
 
         <div class="side-card">
-          <h3>Webhook Activity Feed</h3>
-          <div class="mini-list" id="activityFeed">
-            <div class="mini-item">
-              <strong>No activity yet</strong>
-              <span>Waiting for calls.</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="side-card">
-          <h3>Live Agent Status</h3>
+          <h3>Sales Users</h3>
           <div class="mini-list" id="liveAgents">
             <div class="mini-item">
-              <strong>Loading...</strong>
-              <span>Checking CAR locations...</span>
+              <strong>Loading Sales Users...</strong>
+              <span>Checking CAR Accounts...</span>
             </div>
           </div>
         </div>
@@ -620,7 +610,23 @@
 
     function isAnswered(call) {
       const status = String(call.callStatus || '').toLowerCase();
-      return status.includes('answer') || status.includes('complete');
+
+      if (
+        status.includes('no answer') ||
+        status.includes('no-answer') ||
+        status.includes('miss') ||
+        status.includes('busy') ||
+        status.includes('cancel') ||
+        status.includes('fail') ||
+        status.includes('voice')
+      ) {
+        return false;
+      }
+
+      return (
+        status.includes('answered') ||
+        status.includes('complete')
+      );
     }
 
     function isVoicemail(call) {
@@ -753,7 +759,6 @@
       renderTable(calls);
       renderAgentLeaderboard(calls);
       renderHourlyBoard(calls);
-      renderActivityFeed(calls);
     }
 
     function renderTable(calls) {
@@ -885,31 +890,6 @@
       }).join('');
     }
 
-    function renderActivityFeed(calls) {
-      const feed = document.getElementById('activityFeed');
-
-      if (!calls.length) {
-        feed.innerHTML = `
-          <div class="mini-item">
-            <strong>No activity yet</strong>
-            <span>Waiting for calls.</span>
-          </div>
-        `;
-        return;
-      }
-
-      feed.innerHTML = calls.slice(0, 12).map(call => {
-        const callDuration = parseDuration(call.callDurationRaw || call.callDurationSeconds || call.callDuration);
-
-        return `
-          <div class="mini-item feed-item">
-            <strong>${safe(call.timeOfCall, 'N/A')} • ${safe(call.callStatus, 'Call')}</strong>
-            <span>${safe(call.agent, 'Unassigned')} • ${safe(call.callDirection, 'N/A')} • ${safe(call.subAccount, 'Unknown')} • ${duration(callDuration)}</span>
-          </div>
-        `;
-      }).join('');
-    }
-
     async function loadLiveData() {
       try {
         const res = await fetch('/api/live');
@@ -960,8 +940,8 @@
       if (!uniqueAgents.length) {
         container.innerHTML = `
           <div class="mini-item">
-            <strong>No live agents found</strong>
-            <span>CAR accounts are connected, but no agents were returned.</span>
+            <strong>No sales users found</strong>
+            <span>CAR accounts are connected, but no sales users were returned.</span>
           </div>
         `;
         return;
