@@ -1,9 +1,54 @@
-let stats = {
+let memoryStats = {
   totalEvents: 0,
   lastEvent: null,
   lastPayload: null,
   recentContacts: []
 };
+
+const KV_URL = process.env.KV_REST_API_URL;
+const KV_TOKEN = process.env.KV_REST_API_TOKEN;
+const STORAGE_KEY = "mcc-dashboard-ghl-stats";
+
+async function kvGet() {
+  if (!KV_URL || !KV_TOKEN) return memoryStats;
+
+  try {
+    const response = await fetch(`${KV_URL}/get/${STORAGE_KEY}`, {
+      headers: {
+        Authorization: `Bearer ${KV_TOKEN}`
+      }
+    });
+
+    const data = await response.json();
+
+    if (!data.result) return memoryStats;
+
+    return typeof data.result === "string"
+      ? JSON.parse(data.result)
+      : data.result;
+  } catch {
+    return memoryStats;
+  }
+}
+
+async function kvSet(value) {
+  memoryStats = value;
+
+  if (!KV_URL || !KV_TOKEN) return;
+
+  try {
+    await fetch(`${KV_URL}/set/${STORAGE_KEY}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${KV_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(value)
+    });
+  } catch {
+    // fallback memory still works
+  }
+}
 
 function normalizeDebt(value) {
   if (!value) return 0;
@@ -90,16 +135,16 @@ function normalizeStatus(value) {
   const str = String(value || "").toLowerCase();
 
   if (!str) return "";
-  if (str.includes("complete")) return "Completed";
-  if (str.includes("answered")) return "Answered";
-  if (str.includes("voicemail")) return "Voicemail";
-  if (str.includes("voice mail")) return "Voicemail";
   if (str.includes("no-answer")) return "No Answer";
   if (str.includes("no answer")) return "No Answer";
+  if (str.includes("voicemail")) return "Voicemail";
+  if (str.includes("voice mail")) return "Voicemail";
   if (str.includes("busy")) return "Busy";
   if (str.includes("cancel")) return "Canceled";
   if (str.includes("miss")) return "Missed";
   if (str.includes("fail")) return "Failed";
+  if (str.includes("answered")) return "Answered";
+  if (str.includes("complete")) return "Completed";
 
   return titleCase(value);
 }
@@ -113,11 +158,11 @@ function displayLocationName(value) {
   return String(raw).trim();
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
+  const stats = await kvGet();
+
   if (req.method === "POST") {
     const body = req.body || {};
-
-    stats.totalEvents += 1;
 
     const locationValue = getValue(body, [
       "location.name",
@@ -225,7 +270,6 @@ export default function handler(req, res) {
       ]),
 
       subAccount: displayLocationName(locationValue) || "Unknown",
-
       locationId: locationIdValue,
 
       debtAmount: debtAmountValue || "$0",
@@ -245,13 +289,17 @@ export default function handler(req, res) {
       createdAt: new Date().toISOString()
     };
 
-    stats.lastEvent = "call_event";
-    stats.lastPayload = contact;
+    const nextStats = {
+      totalEvents: Number(stats.totalEvents || 0) + 1,
+      lastEvent: "call_event",
+      lastPayload: contact,
+      recentContacts: [
+        contact,
+        ...(Array.isArray(stats.recentContacts) ? stats.recentContacts : [])
+      ].slice(0, 1000)
+    };
 
-    stats.recentContacts.unshift(contact);
-
-    // Keep more calls so you can review full-day activity.
-    stats.recentContacts = stats.recentContacts.slice(0, 1000);
+    await kvSet(nextStats);
 
     return res.status(200).json({
       success: true,
