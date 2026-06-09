@@ -103,7 +103,7 @@
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(11, 1fr);
+      grid-template-columns: repeat(10, 1fr);
       gap: 16px;
       margin-bottom: 22px;
     }
@@ -412,37 +412,37 @@
   <div class="container">
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Total Calls</div>
+        <div class="stat-label">Inbound Calls</div>
         <div class="stat-value" id="totalCalls">0</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Answered</div>
+        <div class="stat-label">Inbound Answered</div>
         <div class="stat-value" id="answeredCount">0</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Missed</div>
+        <div class="stat-label">Inbound Missed</div>
         <div class="stat-value" id="missedCount">0</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Voicemails</div>
+        <div class="stat-label">Inbound VM</div>
         <div class="stat-value" id="voicemailCount">0</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Answer Rate</div>
+        <div class="stat-label">Inbound Answer Rate</div>
         <div class="stat-value" id="answerRate">0%</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Avg Call Length</div>
+        <div class="stat-label">Avg Inbound Call</div>
         <div class="stat-value" id="avgCallLength">0s</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Team Talk Time</div>
+        <div class="stat-label">Inbound Talk Time</div>
         <div class="stat-value" id="teamTalkTime">0s</div>
       </div>
 
@@ -461,10 +461,6 @@
         <div class="stat-value" id="highestDebt">$0</div>
       </div>
 
-      <div class="stat-card">
-        <div class="stat-label">Inbound %</div>
-        <div class="stat-value" id="inboundRate">0%</div>
-      </div>
     </div>
 
     <div class="layout">
@@ -508,9 +504,9 @@
             <div>Agent</div>
             <div>In</div>
             <div>Out</div>
-            <div>Ans</div>
+            <div>In%</div>
+            <div>Out%</div>
             <div>Miss</div>
-            <div>Ans%</div>
             <div>Talk</div>
             <div>Avg</div>
             <div>Long</div>
@@ -702,61 +698,56 @@
         return callDate === todayKey;
       });
 
-      const total = calls.length;
-      const answered = calls.filter(isAnswered).length;
-      const missed = calls.filter(isMissed).length;
-      const voicemail = calls.filter(isVoicemail).length;
+      const inboundCalls = calls.filter(call => {
+        return String(call.callDirection || '').toLowerCase().includes('inbound');
+      });
 
-      const answeredTalkSeconds = calls
+      const inboundTotal = inboundCalls.length;
+      const inboundAnswered = inboundCalls.filter(isAnswered).length;
+      const inboundMissed = inboundCalls.filter(isMissed).length;
+      const inboundVoicemail = inboundCalls.filter(isVoicemail).length;
+
+      const inboundAnsweredTalkSeconds = inboundCalls
         .filter(isAnswered)
         .reduce((sum, call) => {
           return sum + parseDuration(call.callDurationRaw || call.callDurationSeconds || call.callDuration);
         }, 0);
 
-      const teamTalkSeconds = calls.reduce((sum, call) => {
+      const inboundTalkSeconds = inboundCalls.reduce((sum, call) => {
         return sum + parseDuration(call.callDurationRaw || call.callDurationSeconds || call.callDuration);
       }, 0);
 
-      const avgCallSeconds = answered > 0
-        ? Math.round(answeredTalkSeconds / answered)
+      const avgInboundCallSeconds = inboundAnswered > 0
+        ? Math.round(inboundAnsweredTalkSeconds / inboundAnswered)
         : 0;
 
-      const answerRate = total > 0
-        ? ((answered / total) * 100).toFixed(1)
+      const inboundAnswerRate = inboundTotal > 0
+        ? ((inboundAnswered / inboundTotal) * 100).toFixed(1)
         : '0.0';
 
-      const debtTotal = calls.reduce((sum, call) => {
+      const debtTotal = inboundCalls.reduce((sum, call) => {
         return sum + parseDebt(call.debtAmount);
       }, 0);
 
-      const avgDebt = total > 0
-        ? debtTotal / total
+      const avgDebt = inboundTotal > 0
+        ? debtTotal / inboundTotal
         : 0;
 
       const highestDebt = Math.max(
-        ...calls.map(call => parseDebt(call.debtAmount)),
+        ...inboundCalls.map(call => parseDebt(call.debtAmount)),
         0
       );
 
-      const inboundCount = calls.filter(call => {
-        return String(call.callDirection || '').toLowerCase().includes('inbound');
-      }).length;
-
-      const inboundRate = total > 0
-        ? ((inboundCount / total) * 100).toFixed(1)
-        : '0.0';
-
-      document.getElementById('totalCalls').innerText = total;
-      document.getElementById('answeredCount').innerText = answered;
-      document.getElementById('missedCount').innerText = missed;
-      document.getElementById('voicemailCount').innerText = voicemail;
-      document.getElementById('answerRate').innerText = answerRate + '%';
-      document.getElementById('avgCallLength').innerText = duration(avgCallSeconds);
-      document.getElementById('teamTalkTime').innerText = duration(teamTalkSeconds);
+      document.getElementById('totalCalls').innerText = inboundTotal;
+      document.getElementById('answeredCount').innerText = inboundAnswered;
+      document.getElementById('missedCount').innerText = inboundMissed;
+      document.getElementById('voicemailCount').innerText = inboundVoicemail;
+      document.getElementById('answerRate').innerText = inboundAnswerRate + '%';
+      document.getElementById('avgCallLength').innerText = duration(avgInboundCallSeconds);
+      document.getElementById('teamTalkTime').innerText = duration(inboundTalkSeconds);
       document.getElementById('debtTotal').innerText = money(debtTotal);
       document.getElementById('avgDebt').innerText = money(avgDebt);
       document.getElementById('highestDebt').innerText = money(highestDebt);
-      document.getElementById('inboundRate').innerText = inboundRate + '%';
 
       renderTable(calls);
       renderAgentLeaderboard(calls);
@@ -807,36 +798,38 @@
         );
 
         const direction = String(call.callDirection || '').toLowerCase();
+        const inbound = direction.includes('inbound');
+        const outbound = direction.includes('outbound');
+        const answered = isAnswered(call);
+        const missed = isMissed(call);
 
         if (!agents[agent]) {
           agents[agent] = {
             inbound: 0,
             outbound: 0,
-            answered: 0,
+            inboundAnswered: 0,
+            outboundAnswered: 0,
             missed: 0,
             talk: 0,
+            answeredTalk: 0,
             debt: 0,
             longestCall: 0
           };
         }
 
-        if (direction.includes('inbound')) {
+        if (inbound) {
           agents[agent].inbound += 1;
+          if (answered) agents[agent].inboundAnswered += 1;
+          if (missed) agents[agent].missed += 1;
         }
 
-        if (direction.includes('outbound')) {
+        if (outbound) {
           agents[agent].outbound += 1;
-        }
-
-        if (isAnswered(call)) {
-          agents[agent].answered += 1;
-        }
-
-        if (isMissed(call)) {
-          agents[agent].missed += 1;
+          if (answered) agents[agent].outboundAnswered += 1;
         }
 
         agents[agent].talk += callDuration;
+        if (answered) agents[agent].answeredTalk += callDuration;
         agents[agent].debt += parseDebt(call.debtAmount);
 
         if (callDuration > agents[agent].longestCall) {
@@ -858,12 +851,18 @@
       }
 
       leaderboard.innerHTML = rows.map(([agent, stats]) => {
-        const avg = stats.answered > 0
-          ? Math.round(stats.talk / stats.answered)
+        const totalAnswered = stats.inboundAnswered + stats.outboundAnswered;
+
+        const avg = totalAnswered > 0
+          ? Math.round(stats.answeredTalk / totalAnswered)
           : 0;
 
-        const answerRate = stats.inbound > 0
-          ? Math.round((stats.answered / stats.inbound) * 100)
+        const inboundAnswerRate = stats.inbound > 0
+          ? Math.round((stats.inboundAnswered / stats.inbound) * 100)
+          : 0;
+
+        const outboundAnswerRate = stats.outbound > 0
+          ? Math.round((stats.outboundAnswered / stats.outbound) * 100)
           : 0;
 
         return `
@@ -871,9 +870,9 @@
             <div class="leaderboard-name">${agent}</div>
             <div>${stats.inbound}</div>
             <div>${stats.outbound}</div>
-            <div>${stats.answered}</div>
+            <div>${inboundAnswerRate}%</div>
+            <div>${outboundAnswerRate}%</div>
             <div>${stats.missed}</div>
-            <div>${answerRate}%</div>
             <div>${duration(stats.talk)}</div>
             <div>${duration(avg)}</div>
             <div>${duration(stats.longestCall)}</div>
