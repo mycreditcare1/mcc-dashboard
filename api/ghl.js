@@ -5,49 +5,122 @@ let memoryStats = {
   recentContacts: []
 };
 
-const KV_URL = process.env.KV_REST_API_URL;
-const KV_TOKEN = process.env.KV_REST_API_TOKEN;
-const STORAGE_KEY = "mcc-dashboard-ghl-stats";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-async function kvGet() {
-  if (!KV_URL || !KV_TOKEN) return memoryStats;
+async function supabaseInsertCall(contact) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, skipped: true, reason: "Missing Supabase env vars" };
+  }
+
+  const row = {
+    location_id: contact.locationId || null,
+    subaccount_name: contact.subAccount || null,
+    agent_name: contact.agent || null,
+    lead_name: contact.name || null,
+    phone: contact.phone || null,
+    status: contact.callStatus || null,
+    direction: contact.callDirection || null,
+    campaign: null,
+    queue: null,
+    duration: Number(contact.callDurationSeconds || 0),
+    event_type: "call",
+    created_at: contact.createdAt || new Date().toISOString()
+  };
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/call_events`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    },
+    body: JSON.stringify(row)
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    console.error("SUPABASE INSERT ERROR:", response.status, text);
+    return {
+      ok: false,
+      status: response.status,
+      error: text
+    };
+  }
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
+
+  return {
+    ok: true,
+    status: response.status,
+    data
+  };
+}
+
+async function supabaseGetCalls() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
+  const response = await fetch(
+    `${SUPABASE_URL}/rest/v1/call_events?select=*&order=created_at.desc&limit=1000`,
+    {
+      method: "GET",
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Accept: "application/json"
+      }
+    }
+  );
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    console.error("SUPABASE READ ERROR:", response.status, text);
+    return null;
+  }
 
   try {
-    const response = await fetch(`${KV_URL}/get/${STORAGE_KEY}`, {
-      headers: {
-        Authorization: `Bearer ${KV_TOKEN}`
-      }
-    });
-
-    const data = await response.json();
-
-    if (!data.result) return memoryStats;
-
-    return typeof data.result === "string"
-      ? JSON.parse(data.result)
-      : data.result;
+    return JSON.parse(text);
   } catch {
-    return memoryStats;
+    return null;
   }
 }
 
-async function kvSet(value) {
-  memoryStats = value;
-
-  if (!KV_URL || !KV_TOKEN) return;
-
-  try {
-    await fetch(`${KV_URL}/set/${STORAGE_KEY}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${KV_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(value)
-    });
-  } catch {
-    // fallback memory still works
-  }
+function mapSupabaseRowsToContacts(rows = []) {
+  return rows.map(row => ({
+    name: row.lead_name || "Unknown",
+    phone: row.phone || "",
+    email: "",
+    subAccount: row.subaccount_name || "Unknown",
+    locationId: row.location_id || "",
+    debtAmount: "$0",
+    debtValue: 0,
+    agent: row.agent_name || "Unassigned",
+    callUser: "",
+    callDirection: row.direction || "",
+    callStatus: row.status || "",
+    callDurationRaw: row.duration || 0,
+    callDurationSeconds: Number(row.duration || 0),
+    callStartTime: "",
+    callEndTime: "",
+    timeOfCall: row.created_at
+      ? new Date(row.created_at).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone: "America/Los_Angeles"
+        })
+      : "",
+    createdAt: row.created_at || new Date().toISOString()
+  }));
 }
 
 function normalizeDebt(value) {
@@ -158,9 +231,16 @@ function displayLocationName(value) {
   return String(raw).trim();
 }
 
-export default async function handler(req, res) {
-  const stats = await kvGet();
+function buildStatsFromContacts(contacts) {
+  return {
+    totalEvents: contacts.length,
+    lastEvent: contacts.length ? "call_event" : null,
+    lastPayload: contacts[0] || null,
+    recentContacts: contacts
+  };
+}
 
+export default async function handler(req, res) {
   if (req.method === "POST") {
     const body = req.body || {};
 
@@ -289,23 +369,27 @@ export default async function handler(req, res) {
       createdAt: new Date().toISOString()
     };
 
-    const nextStats = {
-      totalEvents: Number(stats.totalEvents || 0) + 1,
-      lastEvent: "call_event",
-      lastPayload: contact,
-      recentContacts: [
-        contact,
-        ...(Array.isArray(stats.recentContacts) ? stats.recentContacts : [])
-      ].slice(0, 1000)
-    };
+    const insertResult = await supabaseInsertCall(contact);
 
-    await kvSet(nextStats);
+    memoryStats.totalEvents += 1;
+    memoryStats.lastEvent = "call_event";
+    memoryStats.lastPayload = contact;
+    memoryStats.recentContacts.unshift(contact);
+    memoryStats.recentContacts = memoryStats.recentContacts.slice(0, 1000);
 
     return res.status(200).json({
       success: true,
+      storage: insertResult,
       received: contact
     });
   }
 
-  return res.status(200).json(stats);
+  const rows = await supabaseGetCalls();
+
+  if (Array.isArray(rows)) {
+    const contacts = mapSupabaseRowsToContacts(rows);
+    return res.status(200).json(buildStatsFromContacts(contacts));
+  }
+
+  return res.status(200).json(memoryStats);
 }
