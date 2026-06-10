@@ -25,6 +25,7 @@ async function supabaseInsertCall(contact) {
     queue: null,
     duration: Number(contact.callDurationSeconds || 0),
     event_type: "call",
+    debt_amount: Number(contact.debtValue || 0),
     created_at: contact.createdAt || new Date().toISOString()
   };
 
@@ -102,8 +103,10 @@ function mapSupabaseRowsToContacts(rows = []) {
     email: "",
     subAccount: row.subaccount_name || "Unknown",
     locationId: row.location_id || "",
-    debtAmount: "$0",
-    debtValue: 0,
+    debtAmount: row.debt_amount
+      ? `$${Number(row.debt_amount).toLocaleString()}`
+      : "$0",
+    debtValue: Number(row.debt_amount || 0),
     agent: row.agent_name || "Unassigned",
     callUser: "",
     callDirection: row.direction || "",
