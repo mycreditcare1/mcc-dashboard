@@ -26,6 +26,7 @@ async function supabaseInsertCall(contact) {
     duration: Number(contact.callDurationSeconds || 0),
     event_type: "call",
     debt_amount: Number(contact.debtValue || 0),
+    lead_source: contact.leadSource || null,
     created_at: contact.createdAt || new Date().toISOString()
   };
 
@@ -107,6 +108,7 @@ function mapSupabaseRowsToContacts(rows = []) {
       ? `$${Number(row.debt_amount).toLocaleString()}`
       : "$0",
     debtValue: Number(row.debt_amount || 0),
+    leadSource: row.lead_source || "",
     agent: row.agent_name || "Unassigned",
     callUser: "",
     callDirection: row.direction || "",
@@ -334,6 +336,13 @@ export default async function handler(req, res) {
       "contact.debt_amount"
     ]);
 
+    const leadSourceValue = getValue(body, [
+      "contact.lead_source",
+      "lead_source",
+      "Lead Source",
+      "customData.Lead Source"
+    ]);
+
     const contact = {
       name: getValue(body, [
         "full_name",
@@ -357,6 +366,7 @@ export default async function handler(req, res) {
 
       debtAmount: debtAmountValue || "$0",
       debtValue: normalizeDebt(debtAmountValue),
+      leadSource: leadSourceValue || "",
 
       agent: agentValue || callUserValue || "Unassigned",
       callUser: callUserValue,
