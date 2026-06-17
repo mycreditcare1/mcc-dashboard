@@ -188,7 +188,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 1150px;
+      min-width: 1250px;
     }
 
     th,
@@ -241,6 +241,12 @@
       background: rgba(245,158,11,0.12);
       border-color: rgba(245,158,11,0.25);
       color: #fde68a;
+    }
+
+    .source {
+      background: rgba(168,85,247,0.12);
+      border-color: rgba(168,85,247,0.25);
+      color: #ddd6fe;
     }
 
     .agent,
@@ -403,122 +409,26 @@
     }
 
     @media (max-width: 800px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
       .topbar {
         flex-direction: column;
         align-items: flex-start;
-        gap: 12px;
-        padding: 14px;
-      }
-
-      .brand {
-        width: 100%;
-        gap: 12px;
-      }
-
-      .brand-logo {
-        padding: 6px 10px;
-        border-radius: 12px;
-      }
-
-      .brand-logo img {
-        width: 80px;
-      }
-
-      .brand-copy h1 {
-        font-size: 21px;
-        line-height: 1.1;
-      }
-
-      .brand-copy p {
-        font-size: 12px;
-      }
-
-      .live-pill {
-        padding: 8px 12px;
-        font-size: 12px;
-      }
-
-      .container {
-        padding: 14px;
-      }
-
-      .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-
-      .stat-card {
-        min-height: auto;
-        padding: 14px;
-        border-radius: 14px;
-      }
-
-      .stat-label {
-        font-size: 10px;
-        margin-bottom: 8px;
-      }
-
-      .stat-value {
-        font-size: 23px;
-      }
-
-      .layout {
-        grid-template-columns: 1fr;
-        gap: 16px;
-      }
-
-      .card-head {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 6px;
-        padding: 14px;
-      }
-
-      .card-head h3,
-      .side-card h3 {
-        font-size: 17px;
-      }
-
-      .table-card {
-        overflow-x: auto;
-      }
-
-      .table-scroll {
-        max-height: 460px;
-      }
-
-      table {
-        min-width: 980px;
-      }
-
-      th,
-      td {
-        padding: 12px 10px;
-        font-size: 12px;
-      }
-
-      .side-stack {
-        margin-top: 0;
         gap: 14px;
       }
 
-      .side-card {
-        padding: 14px;
-        border-radius: 14px;
+      .container {
+        padding: 16px;
       }
 
       .leaderboard-row {
         grid-template-columns: 1fr;
-        gap: 6px;
-        font-size: 13px;
       }
 
       .leaderboard-head {
         display: none;
-      }
-
-      .hourly-scroll {
-        max-height: 360px;
       }
     }
   </style>
@@ -610,6 +520,7 @@
                 <th>Time</th>
                 <th>Name</th>
                 <th>Phone</th>
+                <th>Lead Source</th>
                 <th>Sub Account</th>
                 <th>Debt</th>
                 <th>Agent</th>
@@ -621,7 +532,7 @@
 
             <tbody id="tableBody">
               <tr>
-                <td colspan="9" class="empty">Waiting for live activity...</td>
+                <td colspan="10" class="empty">Waiting for live activity...</td>
               </tr>
             </tbody>
           </table>
@@ -664,6 +575,16 @@
         </div>
 
         <div class="side-card">
+          <h3>Top Lead Sources</h3>
+          <div class="mini-list" id="leadSourceBoard">
+            <div class="mini-item">
+              <strong>No lead source data yet</strong>
+              <span>Waiting for inbound calls with lead source.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="side-card">
           <h3>Sales Users</h3>
           <div class="mini-list" id="liveAgents">
             <div class="mini-item">
@@ -687,12 +608,6 @@
   </div>
 
   <script>
-    const ALLOWED_SALES_AGENTS = ['Moya Clarke', 'Camille Hewwing'];
-
-    function isAllowedSalesAgentName(name) {
-      return ALLOWED_SALES_AGENTS.includes(String(name || '').trim());
-    }
-
     function safe(value, fallback = '') {
       return value && String(value).trim() ? value : fallback;
     }
@@ -731,6 +646,21 @@
       return '$' + Number(value || 0).toLocaleString(undefined, {
         maximumFractionDigits: 0
       });
+    }
+
+    function uniqueDebtValues(calls) {
+      const byPhone = {};
+
+      calls.forEach(call => {
+        const phone = safe(call.phone, '').replace(/\D/g, '') || safe(call.name, 'Unknown');
+        const debt = parseDebt(call.debtAmount);
+
+        if (!byPhone[phone] || debt > byPhone[phone]) {
+          byPhone[phone] = debt;
+        }
+      });
+
+      return Object.values(byPhone).filter(value => value > 0);
     }
 
     function duration(seconds) {
@@ -864,18 +794,17 @@
         ? ((inboundAnswered / inboundTotal) * 100).toFixed(1)
         : '0.0';
 
-      const debtTotal = inboundCalls.reduce((sum, call) => {
-        return sum + parseDebt(call.debtAmount);
+      const uniqueInboundDebtValues = uniqueDebtValues(inboundCalls);
+
+      const debtTotal = uniqueInboundDebtValues.reduce((sum, value) => {
+        return sum + value;
       }, 0);
 
-      const avgDebt = inboundTotal > 0
-        ? debtTotal / inboundTotal
+      const avgDebt = uniqueInboundDebtValues.length > 0
+        ? debtTotal / uniqueInboundDebtValues.length
         : 0;
 
-      const highestDebt = Math.max(
-        ...inboundCalls.map(call => parseDebt(call.debtAmount)),
-        0
-      );
+      const highestDebt = Math.max(...uniqueInboundDebtValues, 0);
 
       document.getElementById('totalCalls').innerText = inboundTotal;
       document.getElementById('answeredCount').innerText = inboundAnswered;
@@ -891,6 +820,7 @@
       renderTable(calls);
       renderAgentLeaderboard(calls);
       renderHourlyBoard(inboundCalls);
+      renderTopLeadSources(inboundCalls);
     }
 
     function renderTable(calls) {
@@ -899,7 +829,7 @@
       if (!calls.length) {
         table.innerHTML = `
           <tr>
-            <td colspan="9" class="empty">Waiting for live activity...</td>
+            <td colspan="10" class="empty">Waiting for live activity...</td>
           </tr>
         `;
         return;
@@ -913,6 +843,7 @@
             <td><span class="pill neutral">${safe(call.timeOfCall, 'N/A')}</span></td>
             <td class="name-cell">${safe(call.name, 'Unknown')}</td>
             <td>${safe(call.phone, '')}</td>
+            <td><span class="pill source">${safe(call.leadSource, 'Unknown')}</span></td>
             <td><span class="pill sub">${safe(call.subAccount, 'Unknown')}</span></td>
             <td><span class="pill debt">${safe(call.debtAmount, '$0')}</span></td>
             <td><span class="pill agent">${safe(call.agent, 'Unassigned')}</span></td>
@@ -950,7 +881,7 @@
             missed: 0,
             talk: 0,
             answeredTalk: 0,
-            debt: 0,
+            debtByPhone: {},
             longestCall: 0
           };
         }
@@ -968,16 +899,20 @@
 
         agents[agent].talk += callDuration;
         if (answered) agents[agent].answeredTalk += callDuration;
-        agents[agent].debt += parseDebt(call.debtAmount);
+
+        const debtPhone = safe(call.phone, '').replace(/\D/g, '') || safe(call.name, 'Unknown');
+        const debtValue = parseDebt(call.debtAmount);
+
+        if (!agents[agent].debtByPhone[debtPhone] || debtValue > agents[agent].debtByPhone[debtPhone]) {
+          agents[agent].debtByPhone[debtPhone] = debtValue;
+        }
 
         if (callDuration > agents[agent].longestCall) {
           agents[agent].longestCall = callDuration;
         }
       });
 
-      const rows = Object.entries(agents)
-        .filter(([agent]) => isAllowedSalesAgentName(agent))
-        .sort((a, b) => b[1].talk - a[1].talk);
+      const rows = Object.entries(agents).sort((a, b) => b[1].talk - a[1].talk);
       const leaderboard = document.getElementById('leaderboard');
 
       if (!rows.length) {
@@ -1005,6 +940,10 @@
           ? Math.round((stats.outboundAnswered / stats.outbound) * 100)
           : 0;
 
+        const uniqueAgentDebt = Object.values(stats.debtByPhone || {})
+          .filter(value => value > 0)
+          .reduce((sum, value) => sum + value, 0);
+
         return `
           <div class="leaderboard-row">
             <div class="leaderboard-name">${agent}</div>
@@ -1016,7 +955,7 @@
             <div>${duration(stats.talk)}</div>
             <div>${duration(avg)}</div>
             <div>${duration(stats.longestCall)}</div>
-            <div>${money(stats.debt)}</div>
+            <div>${money(uniqueAgentDebt)}</div>
           </div>
         `;
       }).join('');
@@ -1027,11 +966,7 @@
 
       inboundCalls.forEach(call => {
         const hour = hourLabel(call);
-        const agent = safe(call.agent, '');
-
-        if (!isAllowedSalesAgentName(agent)) {
-          return;
-        }
+        const agent = safe(call.agent, 'Unassigned');
 
         if (!hours[hour]) {
           hours[hour] = {
@@ -1089,6 +1024,40 @@
       }).join('');
     }
 
+    function renderTopLeadSources(inboundCalls) {
+      const container = document.getElementById('leadSourceBoard');
+
+      if (!container) return;
+
+      const sourceCounts = {};
+
+      inboundCalls.forEach(call => {
+        const source = safe(call.leadSource, 'Unknown');
+        sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+      });
+
+      const rows = Object.entries(sourceCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8);
+
+      if (!rows.length) {
+        container.innerHTML = `
+          <div class="mini-item">
+            <strong>No lead source data yet</strong>
+            <span>Waiting for inbound calls with lead source.</span>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = rows.map(([source, count]) => `
+        <div class="mini-item">
+          <strong>${source}</strong>
+          <span>${count} inbound call${count === 1 ? '' : 's'} today</span>
+        </div>
+      `).join('');
+    }
+
     async function loadLiveData() {
       try {
         const res = await fetch('/api/live');
@@ -1136,21 +1105,17 @@
         }
       });
 
-      const filteredAgents = uniqueAgents.filter(agent =>
-        isAllowedSalesAgentName(agent.name)
-      );
-
-      if (!filteredAgents.length) {
+      if (!uniqueAgents.length) {
         container.innerHTML = `
           <div class="mini-item">
             <strong>No sales users found</strong>
-            <span>Only Moya Clarke and Camille Hewwing are shown here.</span>
+            <span>CAR accounts are connected, but no sales users were returned.</span>
           </div>
         `;
         return;
       }
 
-      container.innerHTML = filteredAgents.map(agent => `
+      container.innerHTML = uniqueAgents.map(agent => `
         <div class="mini-item">
           <strong>${safe(agent.name, 'Unknown Agent')}</strong>
           <span>${safe(agent.location, 'Unknown')} • 🟢 Connected</span>
