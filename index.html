@@ -244,8 +244,8 @@
     }
 
     .source {
-      background: rgba(168,85,247,0.12);
-      border-color: rgba(168,85,247,0.25);
+      background: rgba(139,92,246,0.16);
+      border-color: rgba(139,92,246,0.35);
       color: #ddd6fe;
     }
 
@@ -383,6 +383,22 @@
     .hour-agent-row strong {
       color: var(--text);
       font-size: 12px;
+      margin: 0;
+      display: inline;
+    }
+
+    .source-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 4px 0;
+    }
+
+    .source-row strong {
+      color: var(--text);
       margin: 0;
       display: inline;
     }
@@ -579,7 +595,7 @@
           <div class="mini-list" id="leadSourceBoard">
             <div class="mini-item">
               <strong>No lead source data yet</strong>
-              <span>Waiting for inbound calls with lead source.</span>
+              <span>Waiting for source data.</span>
             </div>
           </div>
         </div>
@@ -608,6 +624,36 @@
   </div>
 
   <script>
+    const ALLOWED_SALES_AGENTS = ['Moya Clarke', 'Camille Hewwing'];
+    const BLOCKED_AGENTS = ['Aubrey Lobitana', 'Eunice', 'Joily', 'Joilyn'];
+
+    function isAllowedSalesAgentName(name) {
+      return ALLOWED_SALES_AGENTS.includes(String(name || '').trim());
+    }
+
+    function isBlockedAgentName(name) {
+      const normalized = String(name || '').trim().toLowerCase();
+      return BLOCKED_AGENTS.some(blocked => normalized.includes(blocked.toLowerCase()));
+    }
+
+    function callPhoneKey(call) {
+      return String(call.phone || call.contactPhone || '')
+        .replace(/[^0-9]/g, '') || String(call.name || '').trim().toLowerCase();
+    }
+
+    function uniqueByPhone(calls) {
+      const seen = new Set();
+      const unique = [];
+
+      calls.forEach(call => {
+        const key = callPhoneKey(call);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        unique.push(call);
+      });
+
+      return unique;
+    }
     function safe(value, fallback = '') {
       return value && String(value).trim() ? value : fallback;
     }
@@ -646,21 +692,6 @@
       return '$' + Number(value || 0).toLocaleString(undefined, {
         maximumFractionDigits: 0
       });
-    }
-
-    function uniqueDebtValues(calls) {
-      const byPhone = {};
-
-      calls.forEach(call => {
-        const phone = safe(call.phone, '').replace(/\D/g, '') || safe(call.name, 'Unknown');
-        const debt = parseDebt(call.debtAmount);
-
-        if (!byPhone[phone] || debt > byPhone[phone]) {
-          byPhone[phone] = debt;
-        }
-      });
-
-      return Object.values(byPhone).filter(value => value > 0);
     }
 
     function duration(seconds) {
@@ -794,17 +825,21 @@
         ? ((inboundAnswered / inboundTotal) * 100).toFixed(1)
         : '0.0';
 
-      const uniqueInboundDebtValues = uniqueDebtValues(inboundCalls);
+      const uniqueInboundCalls = uniqueByPhone(inboundCalls);
+      const uniqueInboundDebtCalls = uniqueInboundCalls.filter(call => parseDebt(call.debtAmount) > 0);
 
-      const debtTotal = uniqueInboundDebtValues.reduce((sum, value) => {
-        return sum + value;
+      const debtTotal = uniqueInboundDebtCalls.reduce((sum, call) => {
+        return sum + parseDebt(call.debtAmount);
       }, 0);
 
-      const avgDebt = uniqueInboundDebtValues.length > 0
-        ? debtTotal / uniqueInboundDebtValues.length
+      const avgDebt = uniqueInboundDebtCalls.length > 0
+        ? debtTotal / uniqueInboundDebtCalls.length
         : 0;
 
-      const highestDebt = Math.max(...uniqueInboundDebtValues, 0);
+      const highestDebt = Math.max(
+        ...uniqueInboundDebtCalls.map(call => parseDebt(call.debtAmount)),
+        0
+      );
 
       document.getElementById('totalCalls').innerText = inboundTotal;
       document.getElementById('answeredCount').innerText = inboundAnswered;
@@ -835,7 +870,9 @@
         return;
       }
 
-      table.innerHTML = calls.map(call => {
+      const displayCalls = calls.filter(call => !isBlockedAgentName(call.agent));
+
+      table.innerHTML = displayCalls.map(call => {
         const callDuration = parseDuration(call.callDurationRaw || call.callDurationSeconds || call.callDuration);
 
         return `
@@ -858,7 +895,9 @@
     function renderAgentLeaderboard(calls) {
       const agents = {};
 
-      calls.forEach(call => {
+      calls
+        .filter(call => !isBlockedAgentName(call.agent))
+        .forEach(call => {
         const agent = safe(call.agent, 'Unassigned');
         const callDuration = parseDuration(
           call.callDurationRaw ||
@@ -881,7 +920,8 @@
             missed: 0,
             talk: 0,
             answeredTalk: 0,
-            debtByPhone: {},
+            debt: 0,
+            debtPhones: new Set(),
             longestCall: 0
           };
         }
@@ -899,12 +939,11 @@
 
         agents[agent].talk += callDuration;
         if (answered) agents[agent].answeredTalk += callDuration;
-
-        const debtPhone = safe(call.phone, '').replace(/\D/g, '') || safe(call.name, 'Unknown');
         const debtValue = parseDebt(call.debtAmount);
-
-        if (!agents[agent].debtByPhone[debtPhone] || debtValue > agents[agent].debtByPhone[debtPhone]) {
-          agents[agent].debtByPhone[debtPhone] = debtValue;
+        const debtPhoneKey = callPhoneKey(call);
+        if (debtValue > 0 && debtPhoneKey && !agents[agent].debtPhones.has(debtPhoneKey)) {
+          agents[agent].debt += debtValue;
+          agents[agent].debtPhones.add(debtPhoneKey);
         }
 
         if (callDuration > agents[agent].longestCall) {
@@ -912,7 +951,9 @@
         }
       });
 
-      const rows = Object.entries(agents).sort((a, b) => b[1].talk - a[1].talk);
+      const rows = Object.entries(agents)
+        .filter(([agent]) => isAllowedSalesAgentName(agent))
+        .sort((a, b) => b[1].talk - a[1].talk);
       const leaderboard = document.getElementById('leaderboard');
 
       if (!rows.length) {
@@ -940,10 +981,6 @@
           ? Math.round((stats.outboundAnswered / stats.outbound) * 100)
           : 0;
 
-        const uniqueAgentDebt = Object.values(stats.debtByPhone || {})
-          .filter(value => value > 0)
-          .reduce((sum, value) => sum + value, 0);
-
         return `
           <div class="leaderboard-row">
             <div class="leaderboard-name">${agent}</div>
@@ -955,7 +992,7 @@
             <div>${duration(stats.talk)}</div>
             <div>${duration(avg)}</div>
             <div>${duration(stats.longestCall)}</div>
-            <div>${money(uniqueAgentDebt)}</div>
+            <div>${money(stats.debt)}</div>
           </div>
         `;
       }).join('');
@@ -964,9 +1001,15 @@
     function renderHourlyBoard(inboundCalls) {
       const hours = {};
 
-      inboundCalls.forEach(call => {
+      inboundCalls
+        .filter(call => !isBlockedAgentName(call.agent))
+        .forEach(call => {
         const hour = hourLabel(call);
-        const agent = safe(call.agent, 'Unassigned');
+        const agent = safe(call.agent, '');
+
+        if (!isAllowedSalesAgentName(agent)) {
+          return;
+        }
 
         if (!hours[hour]) {
           hours[hour] = {
@@ -1025,35 +1068,48 @@
     }
 
     function renderTopLeadSources(inboundCalls) {
-      const container = document.getElementById('leadSourceBoard');
+      const board = document.getElementById('leadSourceBoard');
+      if (!board) return;
 
-      if (!container) return;
+      const uniqueInboundCalls = uniqueByPhone(inboundCalls);
+      const sources = {};
 
-      const sourceCounts = {};
-
-      inboundCalls.forEach(call => {
+      uniqueInboundCalls.forEach(call => {
         const source = safe(call.leadSource, 'Unknown');
-        sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+        const debtValue = parseDebt(call.debtAmount);
+
+        if (!sources[source]) {
+          sources[source] = {
+            count: 0,
+            debt: 0
+          };
+        }
+
+        sources[source].count += 1;
+        sources[source].debt += debtValue;
       });
 
-      const rows = Object.entries(sourceCounts)
-        .sort((a, b) => b[1] - a[1])
+      const rows = Object.entries(sources)
+        .sort((a, b) => b[1].count - a[1].count)
         .slice(0, 8);
 
       if (!rows.length) {
-        container.innerHTML = `
+        board.innerHTML = `
           <div class="mini-item">
             <strong>No lead source data yet</strong>
-            <span>Waiting for inbound calls with lead source.</span>
+            <span>Waiting for source data.</span>
           </div>
         `;
         return;
       }
 
-      container.innerHTML = rows.map(([source, count]) => `
+      board.innerHTML = rows.map(([source, stats]) => `
         <div class="mini-item">
-          <strong>${source}</strong>
-          <span>${count} inbound call${count === 1 ? '' : 's'} today</span>
+          <div class="source-row">
+            <span>${source}</span>
+            <strong>${stats.count}</strong>
+          </div>
+          <span>${money(stats.debt)} total debt</span>
         </div>
       `).join('');
     }
@@ -1105,17 +1161,21 @@
         }
       });
 
-      if (!uniqueAgents.length) {
+      const filteredAgents = uniqueAgents.filter(agent =>
+        isAllowedSalesAgentName(agent.name) && !isBlockedAgentName(agent.name)
+      );
+
+      if (!filteredAgents.length) {
         container.innerHTML = `
           <div class="mini-item">
             <strong>No sales users found</strong>
-            <span>CAR accounts are connected, but no sales users were returned.</span>
+            <span>Only Moya Clarke and Camille Hewwing are shown here.</span>
           </div>
         `;
         return;
       }
 
-      container.innerHTML = uniqueAgents.map(agent => `
+      container.innerHTML = filteredAgents.map(agent => `
         <div class="mini-item">
           <strong>${safe(agent.name, 'Unknown Agent')}</strong>
           <span>${safe(agent.location, 'Unknown')} • 🟢 Connected</span>
